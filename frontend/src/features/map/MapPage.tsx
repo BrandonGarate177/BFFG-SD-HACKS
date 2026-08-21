@@ -12,7 +12,6 @@ export function MapPage() {
     timeframeMonths: TIMEFRAME.defaultMonths,
     hardCostPerUnit: COST_ASSUMPTIONS.hardCostPerUnit,
   });
-  const [matchCount, setMatchCount] = useState<number | null>(null);
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
 
   return (
@@ -26,7 +25,6 @@ export function MapPage() {
             // The URL is the interface between features - no cross-feature import.
             navigate(`/parcel/${apn}?hardCost=${filters.hardCostPerUnit}`);
           }}
-          onMatchCount={setMatchCount}
         />
         {!TILES_URL && (
           <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full border border-accent/50 bg-accent/10 px-3 py-1 text-[11px] text-accent backdrop-blur">
@@ -34,7 +32,7 @@ export function MapPage() {
           </div>
         )}
       </div>
-      <FilterPanel filters={filters} onChange={setFilters} matchCount={matchCount} />
+      <FilterPanel filters={filters} onChange={setFilters} />
     </div>
   );
 }

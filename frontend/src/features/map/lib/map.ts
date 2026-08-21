@@ -1,7 +1,7 @@
 import * as maplibregl from "maplibre-gl";
 import type { Map, StyleSpecification } from "maplibre-gl";
 import { Protocol } from "pmtiles";
-import { DOT_TO_POLYGON_ZOOM, MAP_START, TILES_URL } from "../config";
+import { DOT_TO_POLYGON_ZOOM, MAP_MAX_BOUNDS, MAP_MIN_ZOOM, MAP_START, TILES_URL } from "../config";
 import { generateDevParcels } from "./devParcels";
 
 maplibregl.addProtocol("pmtiles", new Protocol().tile);
@@ -45,6 +45,8 @@ export function createMap(container: HTMLDivElement): Map {
     style: BASE_STYLE,
     center: [MAP_START.lng, MAP_START.lat],
     zoom: MAP_START.zoom,
+    minZoom: MAP_MIN_ZOOM,
+    maxBounds: MAP_MAX_BOUNDS,
     attributionControl: { compact: true },
   });
 

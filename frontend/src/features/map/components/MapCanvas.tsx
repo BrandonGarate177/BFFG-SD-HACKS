@@ -9,12 +9,11 @@ type Props = {
   filters: Filters;
   selectedApn: string | null;
   onSelect: (apn: string) => void;
-  onMatchCount: (n: number) => void;
 };
 
 type HoverState = { parcel: TileParcel; x: number; y: number } | null;
 
-export function MapCanvas({ filters, selectedApn, onSelect, onMatchCount }: Props) {
+export function MapCanvas({ filters, selectedApn, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const hoveredId = useRef<string | number | null>(null);
@@ -62,12 +61,6 @@ export function MapCanvas({ filters, selectedApn, onSelect, onMatchCount }: Prop
           if (f) onSelect((f.properties as unknown as TileParcel).apn);
         });
       }
-
-      const recount = () => {
-        const feats = map.queryRenderedFeatures({ layers: INTERACTIVE_LAYERS.filter((l) => map.getLayer(l)) });
-        onMatchCount(new Set(feats.map((f) => (f.properties as { apn?: string }).apn)).size);
-      };
-      map.on("idle", recount);
     });
 
     return () => {

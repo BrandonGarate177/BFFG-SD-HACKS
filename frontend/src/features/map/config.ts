@@ -36,6 +36,21 @@ export const DOT_TO_POLYGON_ZOOM = 13;
 
 export const MAP_START = { lng: -117.1611, lat: 32.7157, zoom: 11.2 } as const;
 
+/** Data only exists for the City of San Diego, so zooming out further just
+ *  pulls in Orange County / inland desert / Tijuana for no reason. Keeps the
+ *  whole city in frame at max zoom-out without pulling in neighbors. */
+export const MAP_MIN_ZOOM = 10;
+
+/**
+ * Hard pan limit, [[west, south], [east, north]]. parcels.pmtiles's own data
+ * bounds (-117.282307,32.534785 to -116.905122,33.114211) padded ~8km so the
+ * edge isn't a wall right at the coastline/city limit - not an arbitrary box.
+ */
+export const MAP_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [-117.36, 32.46],
+  [-116.83, 33.19],
+];
+
 /**
  * When set, the map reads real parcel geometry from a PMTiles archive.
  * When unset it falls back to generated features carrying the identical
