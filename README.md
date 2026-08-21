@@ -11,15 +11,30 @@ under the Cost-of-Living Affordability track.
 
 ## Presenting
 
-<!-- Replace with the team photo. -->
-![Permit Paragons presenting](temp)
+![Permit Paragons presenting](https://github.com/user-attachments/assets/977fa7bb-8c57-4ebe-b344-52bad2ab95bc)
 
 ---
 
 ## The application
 
-<!-- Screenshot links through to the live site. Replace the image file. -->
-[![By-Right Capacity — San Diego](temp)](https://d1xtsrdl1l82x1.cloudfront.net)
+<table>
+  <tr>
+    <td width="50%">
+      <a href="https://d1xtsrdl1l82x1.cloudfront.net">
+        <img src="docs/assets/app-map.png" alt="Map of San Diego parcels with unbuilt by-right capacity" />
+      </a>
+      <br />
+      Every parcel where zoning already permits homes, filtered by budget and timeframe.
+    </td>
+    <td width="50%">
+      <a href="https://d1xtsrdl1l82x1.cloudfront.net/parcel/4770103300">
+        <img src="docs/assets/app-parcel.png" alt="Parcel dashboard: capacity, permit timing, fees, assistant" />
+      </a>
+      <br />
+      Per parcel: capacity, predicted permit timing, fees, and a grounded assistant.
+    </td>
+  </tr>
+</table>
 
 **[d1xtsrdl1l82x1.cloudfront.net](https://d1xtsrdl1l82x1.cloudfront.net)**
 
