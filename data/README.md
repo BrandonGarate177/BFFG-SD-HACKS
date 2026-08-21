@@ -102,6 +102,139 @@ certification), `CSTZB` (zone boundary), null (outside the overlay).
 
 ---
 
+## How these predictions were produced
+
+### Data sources
+
+| Source | What it gives | Scale |
+|---|---|---|
+| [DSD development permits](https://data.sandiego.gov/datasets/development-permits/) — `approvals_created_datasd.csv` | permit dates, status, dwelling-unit counts | 1,249,819 rows |
+| [SANDAG regional parcels](https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0) (FeatureServer) | APN, polygon area, assessed value, existing units, centroid | 1,088,722 parcels |
+| [City base zoning](https://data.sandiego.gov/datasets/gis-zoning/) | `ZONE_NAME` polygons (RS-1-7, RM-1-1, CC-3-5 …) | 3,706 polygons |
+| [Coastal Overlay Zone](https://webmaps.sandiego.gov/arcgis/rest/services/DSD/Zoning_Overlay/MapServer/2) (City DSD) | coastal permit jurisdiction | 6 jurisdiction types |
+| [Municipal Code Ch.13 Art.1 Div.4/5/6](https://docs.sandiego.gov/municode/MuniCodeChapter13/Ch13Art01Division04.pdf) | by-right density by zone | transcribed with citations |
+| [Municipal Code §141.0302](https://docs.sandiego.gov/municode/MuniCodeChapter14/Ch14Art01Division03.pdf) | ADU/JADU counts, Table 141-03A | transcribed |
+| [DSD IB-501 Table 501A](https://www.sandiego.gov/sites/default/files/2026-08/dsdib501.pdf) (Aug 2026) | permit fee rates | transcribed |
+
+All public, no auth. The parcel layer is paged 2,000 rows at a time.
+
+### Processing
+
+**1. Join permits to parcels on APN.** Both sides normalised — whitespace, dashes and
+leading zeros stripped, and integral floats coerced before stringifying (a CSV column of
+APNs with blanks parses as `float64`, so an APN arrives as `4435206900.0`; without the
+coercion it matched nothing and the join silently produced 0%). Match rate **79.8%**;
+unmatched permits are kept with `parcel_matched=False`, not dropped.
+
+**2. Attach City zoning by point-in-polygon.** Parcel centroids reprojected EPSG:2230 →
+4326 and joined against the zoning layer. This doubles as the City-limits clip: **393,755
+of 1,088,722** parcels fall inside a City zone. The rest are county, where DSD permit data
+doesn't apply.
+
+**3. Attach the Coastal Overlay** the same way — 46,511 parcels, of which 2,367 are
+`DEF-CER` (no certified Local Coastal Program at all).
+
+**4. Compute lot area from polygon geometry.** The parcel layer's `acreage` attribute is
+populated on only **13.9%** of rows, so `SHAPE__Area` is the primary source. Where both
+exist they agree to within a fraction of a percent.
+
+**5. Filter to housing-adding permits and assign an archetype.** `APPROVAL_ADU_TOTAL` or
+`APPROVAL_JADU_TOTAL` > 0 → `adu`; otherwise by `APPROVAL_DU_NET_CHANGE`: 2 → `duplex`,
+3–4 → `3_4_unit`, ≥5 → `5plus`. ADU is tested first because an ADU permit usually also
+records a net change of 1. Yields **12,248 permits** of 1,249,819:
+
+```
+adu       8,379      duplex      952
+5plus     2,017      3_4_unit    900
+```
+
+**6. Build survival labels.** See below.
+
+**7. Compute by-right capacity** from the transcribed code rules, applying the
+round-half-up convention of §113.0222(a).
+
+### The modelling problem
+
+**Time to permit issuance is right-censored, not a regression or classification target.**
+About **29% of housing permits have not been issued yet**. They have not been *denied* — the
+event simply hasn't been observed. A classifier has to assign them a label; a regressor
+trained only on issued permits fits a biased sample (the ones that already finished) and
+systematically under-predicts.
+
+`APPROVAL_STATUS` cannot carry the outcome either. The live file has **37 distinct status
+values**, and **75% of rows marked "Cancelled" carry an `APPROVAL_ISSUE_DATE`** — they were
+issued and cancelled *later*. Labelling by status would call most approvals denials.
+
+So the label is derived from dates, not status:
+
+- **Event observed** — `APPROVAL_ISSUE_DATE` populated. Duration = issue − create.
+- **Censored** — no issue date. Censored at the close date for applications that ended
+  (cancelled, withdrawn, expired — a competing risk), or at today for ones still open.
+
+Event rate **71.3%**.
+
+### Model
+
+**`RandomSurvivalForest`** (scikit-survival), 200 trees, `min_samples_leaf=20`,
+`max_features="sqrt"`. **`CoxPHSurvivalAnalysis`** is fit alongside as a linear baseline —
+without it a mediocre C-index looks respectable.
+
+**Features (11).** Everything must be derivable from a parcel plus a chosen archetype,
+because that is all a caller has at prediction time:
+
+```
+categorical  archetype, zone, nucleus_zone_cd, nucleus_use_cd,
+             situs_community, situs_zip
+numeric      lot_sqft, asr_total, asof_year, asof_month
+boolean      parcel_matched
+```
+
+Enforced by a **positive allowlist**, not a leakage denylist: the feature builder selects
+down to the permitted columns as its first operation, so nothing downstream can reach a
+permit-only field even by accident. That deliberately excludes `APPROVAL_VALUATION`,
+`APPROVAL_FLOOR_AREA`, `APPROVAL_STORIES`, `APPROVAL_TYPE`, and the permit's
+lat/long — all of which only exist once an application has been filed. Location signal comes
+from the parcel's community and ZIP instead.
+
+Categoricals are one-hot encoded with `handle_unknown="ignore"` and `min_frequency=25`;
+numerics median-imputed. The transformer is fit on the training split only.
+
+**Split is chronological, never random** — sorted by application date, cut so ~80% falls
+before. Permit rules and staffing change over time, so a random split leaks future
+regulatory context backwards. Cutoff **2025-02-20**, 9,798 train / 2,450 test.
+
+**Metric is C-index** (concordance) — the share of comparable pairs ranked in the right
+order, handling censoring natively. 0.5 is a coin flip.
+
+| Model | C-index |
+|---|---|
+| chance | 0.500 |
+| Cox PH (linear baseline) | 0.574 |
+| **RandomSurvivalForest** | **0.612** |
+
+**Outputs** are read off each parcel's predicted survival curve *S(t)*: the median is the
+first *t* where *S(t)* ≤ 0.5, and `prob_issued_180d` / `prob_issued_365d` are 1 − *S(t)* at
+those horizons.
+
+High quantiles are deliberately absent. With 29% censoring the curves plateau — p75 is
+undefined for ~72% of parcels and p90 for essentially all of them. Substituting the maximum
+observed duration would state a hard number the data does not support, so horizon
+probabilities are reported instead.
+
+### What is *not* modelled
+
+**Permit fees are a deterministic lookup**, not a prediction — published rates applied to
+project square footage. There is nothing stochastic to learn and a model would be strictly
+worse than reading the table.
+
+**Capacity is rule-based**, transcribed from the municipal code with section citations and
+tested against the code's own worked example (65,340 ÷ 2,000 = 32.67 → 33 units). Not
+learned from data.
+
+**Construction cost is not modelled at all** — out of scope by design.
+
+---
+
 ## What the UI must say
 
 **Say "by-right capacity". Never "pre-approved."** Zoning is a standing permission — no
