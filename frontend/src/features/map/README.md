@@ -32,8 +32,10 @@ identical cost and the budget slider would stop discriminating spatially.
 
 ## Current state
 
-`TILES_URL` is unset, so the map renders generated features from
-`lib/devParcels.ts` carrying the exact production schema. A banner says so
-on screen. When real geometry lands, set `VITE_TILES_URL` — no other change.
-
-Their APNs are synthetic and will 404 against `/parcel-detail`. Expected.
+`frontend/public/parcels.pmtiles` has real City-of-San-Diego parcel geometry
+(fetched from SANDAG, joined to `parcels_tile_attributes.parquet` — see
+`TODO.md`), and `frontend/.env` sets `VITE_TILES_URL=/parcels.pmtiles`. If
+`.env` is missing, `TILES_URL` is unset and the map falls back to generated
+features from `lib/devParcels.ts` carrying the exact production schema, with
+a banner saying so on screen — their APNs are synthetic and 404 against
+`/parcel-detail`.

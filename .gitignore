@@ -1,3 +1,28 @@
+# macOS
+.DS_Store
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python / server
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Editors
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.local
+
 # Raw teammate handoff dump — contains its own .git/ and .env (API key).
 # Only permit_type_stats.csv was pulled out (into server/); everything else
 # here is reference material, never meant to be committed as-is.
