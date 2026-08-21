@@ -1,10 +1,43 @@
-import os
+import re
 from typing import Any
 
-import httpx
+import permit_rag
 
-RAG_API_URL = os.environ.get("RAG_API_URL")
-TIMEOUT_SECONDS = 10.0
+# The teammates' Gradio bot (RAG_API_URL, gradio_client) has been retired —
+# its ngrok tunnel is dead and out of our control. ANTHROPIC_API_KEY now
+# powers this too: we build a parcel-specific question and hand it to the
+# same self-hosted Claude + permit_type_stats.csv retrieval that /rag/chat
+# uses (permit_rag.answer_question), then reshape the answer into this
+# endpoint's reasons/sentiment_summary contract.
+
+
+def _build_question(parcel: dict[str, Any]) -> str:
+    context = parcel.get("parcel", {})
+    zone = context.get("zone", "an unknown zone")
+    community = context.get("situs_community", "San Diego")
+    delta_units = parcel.get("capacity", {}).get("delta_units")
+    capacity_note = (
+        f" with by-right capacity for about {delta_units} additional units" if delta_units else ""
+    )
+    return (
+        f"I'm evaluating a parcel zoned {zone} in {community}, San Diego{capacity_note}. "
+        "What should I know about typical permit timing and cost for a project like this?"
+    )
+
+
+def _parse_chat_response(text: str) -> dict[str, Any]:
+    """Claude's answer is free-form markdown, not structured JSON. Pull out
+    bullet/numbered lines as discrete reasons; fall back to the whole
+    response as a single reason if it isn't list-formatted."""
+    bullet_lines = [
+        re.sub(r"^\s*([-*]|\d+\.)\s+", "", line).strip()
+        for line in text.splitlines()
+        if re.match(r"^\s*([-*]|\d+\.)\s+", line)
+    ]
+    return {
+        "reasons": bullet_lines if bullet_lines else [text.strip()],
+        "sentiment_summary": text.strip(),
+    }
 
 
 def _mock_rag_response(parcel: dict[str, Any]) -> dict[str, Any]:
@@ -32,28 +65,15 @@ def _mock_rag_response(parcel: dict[str, Any]) -> dict[str, Any]:
 
 async def get_rag_context(parcel: dict[str, Any]) -> dict[str, Any]:
     """
-    Calls the external RAG bot API for a single parcel's reasons/context.
-    Falls back to a mock response (matching the same shape) if the URL is
-    unset or the call fails for any reason, so callers never need to handle
-    an error case themselves.
+    Asks Claude (via permit_rag, grounded in permit_type_stats.csv) for
+    context on a parcel. Falls back to a mock response (matching the same
+    shape) if ANTHROPIC_API_KEY is unset or the call fails, so callers never
+    need to handle an error case themselves.
     """
-    if not RAG_API_URL:
-        return {**_mock_rag_response(parcel), "source": "mock", "error": None}
+    question = _build_question(parcel)
+    result = await permit_rag.answer_question(question)
 
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            response = await client.post(RAG_API_URL, json=parcel)
-            response.raise_for_status()
-            data = response.json()
-            return {
-                "reasons": data["reasons"],
-                "sentiment_summary": data["sentiment_summary"],
-                "source": "live",
-                "error": None,
-            }
-    except Exception as exc:
-        return {
-            **_mock_rag_response(parcel),
-            "source": "mock",
-            "error": f"{type(exc).__name__}: {exc}",
-        }
+    if result["source"] != "live":
+        return {**_mock_rag_response(parcel), "source": result["source"], "error": result["error"]}
+
+    return {**_parse_chat_response(result["answer"]), "source": "live", "error": None}
