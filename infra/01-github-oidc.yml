@@ -11,6 +11,20 @@ Parameters:
   GitHubRepo:
     Type: String
     Default: BFFG-SD-HACKS
+  GitHubOwnerId:
+    Type: String
+    Default: "166776131"
+    Description: >
+      Numeric owner id. GitHub now issues the sub claim in an immutable form
+      that embeds numeric ids — repo:OWNER@<ownerId>/REPO@<repoId>:ref:... —
+      so a pattern written against names alone never matches and every job
+      fails with "Not authorized to perform sts:AssumeRoleWithWebIdentity".
+      Nothing in the workflow logs names the claim; only CloudTrail does.
+      Find yours with: gh api repos/OWNER/REPO --jq '.owner.id, .id'
+  GitHubRepoId:
+    Type: String
+    Default: "1341224109"
+    Description: Numeric repository id. See GitHubOwnerId.
 
 Resources:
   GitHubOidcProvider:
@@ -20,7 +34,11 @@ Resources:
       ClientIdList: [sts.amazonaws.com]
       # AWS now validates GitHub's cert chain against its own trust store, but
       # the thumbprint field is still required by the API.
-      ThumbprintList: ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+      # Both of GitHub's published thumbprints. AWS validates the cert chain
+      # itself for well-known providers, but the field is still required.
+      ThumbprintList:
+        - "6938fd4d98bab03faadb97b34396831e3780aea1"
+        - "1c58a3a8518e8759bf075b76b750d4f2df264fcd"
 
   DeployRole:
     Type: AWS::IAM::Role
@@ -38,8 +56,16 @@ Resources:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               # Scoped to this repo. Without this condition ANY GitHub repo
               # on the internet could assume the role.
+              #
+              # Both forms are listed: the id-bearing one is what GitHub
+              # actually sends today, and the name-only one is kept for
+              # older/other token formats. Matching on ids is also stricter —
+              # renaming or transferring the repo cannot hand someone else
+              # this role.
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:*
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubOrg}/${GitHubRepo}:*
+                  - !Sub repo:${GitHubOrg}@${GitHubOwnerId}/${GitHubRepo}@${GitHubRepoId}:*
       Policies:
         - PolicyName: deploy
           PolicyDocument:
