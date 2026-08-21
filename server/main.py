@@ -1,8 +1,10 @@
+import asyncio
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 import parcel_lookup
@@ -76,11 +78,49 @@ async def model_info() -> dict:
 
 @app.post("/rag/chat", response_model=RagChatResponse)
 async def rag_chat(request: RagChatRequest) -> RagChatResponse:
-    """General-purpose permit Q&A, grounded in permit_type_stats.csv. Same
-    underlying Claude call as /parcel-detail's rag_result, just asked a
-    free-form question instead of one built from a specific parcel."""
+    """General-purpose permit Q&A, grounded in permit_type_stats.csv. One-shot,
+    no memory of prior questions — see /ws/rag/chat for a stateful version."""
     result = await permit_rag.answer_question(request.message)
     return RagChatResponse(**result)
+
+
+WS_PING_INTERVAL_SECONDS = 25.0
+
+
+@app.websocket("/ws/rag/chat")
+async def rag_chat_ws(websocket: WebSocket) -> None:
+    """Interactive, multi-turn version of /rag/chat. Holds one connection open
+    per client and keeps a running `messages` array of the conversation so
+    far, so follow-up questions ("what about ADUs?") have context — unlike
+    the stateless POST endpoint, which answers each call in isolation.
+
+    Waits for the client to send {"message": "..."}; while idle, sends
+    {"type": "ping"} every WS_PING_INTERVAL_SECONDS instead of blocking
+    forever, so the connection doesn't sit silent long enough for a proxy's
+    idle timeout to kill it.
+    """
+    await websocket.accept()
+    messages: list[dict[str, str]] = []
+    try:
+        while True:
+            try:
+                data = await asyncio.wait_for(
+                    websocket.receive_json(), timeout=WS_PING_INTERVAL_SECONDS
+                )
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "ping"})
+                continue
+
+            question = (data.get("message") or "").strip()
+            if not question:
+                continue
+
+            messages.append({"role": "user", "content": question})
+            result = await permit_rag.answer_conversation(messages)
+            messages.append({"role": "assistant", "content": result["answer"]})
+            await websocket.send_json({"type": "answer", **result})
+    except WebSocketDisconnect:
+        pass
 
 
 @app.get("/health")

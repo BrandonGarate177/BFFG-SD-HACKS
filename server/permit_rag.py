@@ -14,7 +14,7 @@ from anthropic import AsyncAnthropic
 # their finished output, not something this server regenerates.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 STATS_PATH = Path(__file__).parent / "permit_type_stats.csv"
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-haiku-4-5-20251001"  # faster/cheaper than sonnet; matches the teammate's own update
 
 SYSTEM = (
     "You are an expert assistant for San Diego real estate development, covering permit "
@@ -30,6 +30,14 @@ SYSTEM = (
     "data.\n\n"
     "If a question needs site-specific data you don't have, say so and tell the user where "
     "to find it.\n\n"
+    "You may be continuing an earlier conversation — use the prior turns for context (e.g. "
+    "'the slowest one' refers back to whatever was discussed before), without re-explaining "
+    "things already established.\n\n"
+    "IMPORTANT: Reply in plain text only. No markdown — no asterisks, no pound signs, no "
+    "dashes for dividers, no bold, no headers. Write in clear paragraphs. Do not add "
+    "disclaimers about your knowledge source. Do not say phrases like 'Based on the closed "
+    "approvals data', 'Based on the dataset', 'Drawing on my knowledge', or any similar "
+    "preamble. Just answer directly.\n\n"
 )
 
 _client: Optional[AsyncAnthropic] = None
@@ -105,19 +113,33 @@ def _mock_answer(question: str) -> str:
     )
 
 
-async def answer_question(question: str) -> dict[str, Any]:
+def _last_user_message(messages: list[dict[str, str]]) -> str:
+    return next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+
+
+def _retrieval_query(messages: list[dict[str, str]]) -> str:
+    """Retrieval is grounded in the recent user turns, not just the newest one,
+    so a short follow-up ("what about ADUs?") still pulls relevant rows even
+    though it doesn't repeat words like "permit" or "days" from earlier turns."""
+    user_turns = [m["content"] for m in messages if m["role"] == "user"]
+    return " ".join(user_turns[-2:])
+
+
+async def answer_conversation(messages: list[dict[str, str]]) -> dict[str, Any]:
     """
-    Answers a free-text permit question, grounded in permit_type_stats.csv via
-    keyword retrieval, using Claude. Falls back to a mock answer if
-    ANTHROPIC_API_KEY is unset or the call fails, so callers never need to
-    handle an error case themselves.
+    Answers the newest user turn in `messages` (the full conversation so far,
+    each item {"role": "user"|"assistant", "content": str}, ending on a user
+    turn), grounded in permit_type_stats.csv via keyword retrieval, using
+    Claude with the full history for follow-up context. Falls back to a mock
+    answer if ANTHROPIC_API_KEY is unset or the call fails, so callers never
+    need to handle an error case themselves.
     """
     if not ANTHROPIC_API_KEY:
-        return {"answer": _mock_answer(question), "source": "mock", "error": None}
+        return {"answer": _mock_answer(_last_user_message(messages)), "source": "mock", "error": None}
 
     try:
         rows = _load_rows()
-        chunks = _retrieve(question, rows)
+        chunks = _retrieve(_retrieval_query(messages), rows)
         context = "\n\n".join(_row_to_text(r) for r in chunks)
 
         client = _get_client()
@@ -125,12 +147,17 @@ async def answer_question(question: str) -> dict[str, Any]:
             model=MODEL,
             max_tokens=700,
             system=SYSTEM + f"RETRIEVED PERMIT STATISTICS:\n{context}",
-            messages=[{"role": "user", "content": question}],
+            messages=messages,
         )
         return {"answer": response.content[0].text, "source": "live", "error": None}
     except Exception as exc:
         return {
-            "answer": _mock_answer(question),
+            "answer": _mock_answer(_last_user_message(messages)),
             "source": "mock",
             "error": f"{type(exc).__name__}: {exc}",
         }
+
+
+async def answer_question(question: str) -> dict[str, Any]:
+    """Single-shot version, no history — used by POST /rag/chat and rag_client.py."""
+    return await answer_conversation([{"role": "user", "content": question}])
