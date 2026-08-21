@@ -1,0 +1,63 @@
+name: Deploy server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "data/predictions.parquet"
+      - "data/predictions_meta.json"
+      - ".github/workflows/deploy-server.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false   # never cancel a half-finished ECS rollout
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPO: bffg-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          # Build context is the repo root: the image needs data/*.parquet
+          # as well as server/, so the Dockerfile references both.
+          docker build -f server/Dockerfile -t "$REGISTRY/$ECR_REPO:${{ github.sha }}" -t "$REGISTRY/$ECR_REPO:latest" .
+          docker push "$REGISTRY/$ECR_REPO:${{ github.sha }}"
+          docker push "$REGISTRY/$ECR_REPO:latest"
+
+      - name: Roll out
+        run: |
+          aws ecs update-service \
+            --cluster bffg --service bffg-server --force-new-deployment >/dev/null
+          echo "waiting for the service to stabilise (allow ~2 min for parquet load)"
+          aws ecs wait services-stable --cluster bffg --services bffg-server
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.VITE_API_BASE }}/health" || true)
+            [ "$code" = "200" ] && { echo "healthy"; exit 0; }
+            sleep 10
+          done
+          echo "server did not become healthy"; exit 1

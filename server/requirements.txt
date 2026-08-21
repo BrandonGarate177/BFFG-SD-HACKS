@@ -4,5 +4,9 @@ httpx==0.27.2
 pydantic==2.13.4
 python-dotenv==1.0.1
 pandas==2.2.3
-pyarrow==25.0.1
+# data/*.parquet were written by pyarrow 25.0.1. Older readers fail with
+# "Repetition level histogram size mismatch" — the file uses a page-index
+# structure they cannot parse. 17.0.0 also has no cp313/cp314 wheel, so it
+# tries to build from source and fails on Python 3.13+. Do not pin this back.
+pyarrow>=25.0.0
 anthropic==0.40.0

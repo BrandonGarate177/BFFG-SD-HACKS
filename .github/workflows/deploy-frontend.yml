@@ -1,0 +1,70 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC; without it the role assume fails
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      # Vite inlines these at BUILD time. Setting them on the host after
+      # deploy does nothing — they have to be present right here.
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_TILES_URL: ${{ vars.VITE_TILES_URL }}
+        run: |
+          test -n "$VITE_API_BASE"  || { echo "VITE_API_BASE not set"; exit 1; }
+          test -n "$VITE_TILES_URL" || { echo "VITE_TILES_URL not set"; exit 1; }
+          npm run build
+
+      # The tile archive is uploaded separately (see deploy-tiles) so a code
+      # change doesn't re-push 73 MB. Drop it from dist before syncing.
+      - name: Sync site
+        run: |
+          rm -f frontend/dist/parcels.pmtiles
+          aws s3 sync frontend/dist "s3://${{ vars.SITE_BUCKET }}" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude index.html
+          aws s3 cp frontend/dist/index.html "s3://${{ vars.SITE_BUCKET }}/index.html" \
+            --cache-control "no-cache"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.DISTRIBUTION_ID }}" \
+            --paths "/index.html" "/"
