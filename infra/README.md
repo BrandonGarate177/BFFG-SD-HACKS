@@ -29,22 +29,53 @@ aws cloudformation describe-stacks --stack-name bffg-oidc \
 
 Copy `DeployRoleArn`.
 
-## 2. Frontend infrastructure
+## 2. Server infrastructure
 
 ```bash
+VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
+  --query 'Vpcs[0].VpcId' --output text --region us-west-2)
+SUBNETS=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC \
+  --query 'Subnets[*].SubnetId' --output text --region us-west-2 | tr '\t' ',')
+
 aws cloudformation deploy \
-  --template-file infra/02-frontend.yml \
-  --stack-name bffg-frontend \
-  --region us-west-2
+  --template-file infra/02-server.yml \
+  --stack-name bffg-server \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-west-2 \
+  --parameter-overrides \
+      VpcId=$VPC SubnetIds="$SUBNETS" AnthropicApiKey="$ANTHROPIC_API_KEY"
 
 aws cloudformation describe-stacks --stack-name bffg-frontend \
   --query 'Stacks[0].Outputs' --output table --region us-west-2
 ```
 
-CloudFront takes 5–15 minutes to finish distributing. Copy `SiteBucketName`,
-`TilesBucketName`, `DistributionId`, `SiteUrl`, `TilesUrl`.
+### The ECS service will stall unless an image exists first
 
-## 3. Server infrastructure
+`AWS::ECS::Service` does not report CREATE_COMPLETE until a task is running
+and healthy. With an empty ECR there is nothing to pull, so the stack sits in
+CREATE_IN_PROGRESS for up to three hours and then rolls back — it looks like a
+slow deploy and is actually a deadlock.
+
+**Push an image as soon as the ECR repository exists** (about 30 seconds into
+the stack), in a second terminal:
+
+```bash
+REG=<account-id>.dkr.ecr.us-west-2.amazonaws.com
+aws ecr get-login-password --region us-west-2 \
+  | docker login --username AWS --password-stdin $REG
+
+# --platform is required: Fargate is x86, Apple Silicon is arm64. An arm
+# image pulls fine and then crash-loops with an exec format error.
+docker build --platform linux/amd64 -f server/Dockerfile -t $REG/bffg-server:latest .
+docker push $REG/bffg-server:latest
+```
+
+The service picks it up on its next attempt and the stack completes. After the
+first deploy this never recurs — the workflow keeps `:latest` populated.
+
+Copy `ApiUrl` (the raw ALB address; the browser will use the CloudFront one).
+
+## 3. Frontend infrastructure
 
 Uses your default VPC rather than building networking from scratch:
 
@@ -65,11 +96,9 @@ aws cloudformation deploy \
       AnthropicApiKey="$ANTHROPIC_API_KEY"
 ```
 
-Export `ANTHROPIC_API_KEY` in your shell first — don't paste it into a file.
-The first deploy fails to start a task because ECR is still empty; that's
-expected and resolves on the first server workflow run.
-
-Copy `ApiUrl`.
+Takes the ALB address so CloudFront can proxy `/api/*` to it. CloudFront needs
+5–15 minutes to distribute. Copy `SiteBucketName`, `TilesBucketName`,
+`DistributionId`, `SiteUrl`, `TilesUrl`, `ApiUrl`.
 
 ## 4. GitHub repo variables
 
@@ -82,8 +111,8 @@ none of these are sensitive):
 | `SITE_BUCKET` | `SiteBucketName` from step 2 |
 | `TILES_BUCKET` | `TilesBucketName` from step 2 |
 | `DISTRIBUTION_ID` | `DistributionId` from step 2 |
-| `VITE_API_BASE` | `ApiUrl` from step 3 |
-| `VITE_TILES_URL` | `TilesUrl` from step 2 |
+| `VITE_API_BASE` | `ApiUrl` from step 3 — the **CloudFront** `/api` URL, not the ALB |
+| `VITE_TILES_URL` | `TilesUrl` from step 3 |
 
 ## 5. First deploy, in order
 
@@ -116,12 +145,15 @@ panel does **not** say `mock`.
 
 ## Known rough edges
 
-**HTTP, not HTTPS, on the API.** The ALB listens on port 80. A CloudFront site
-on HTTPS calling an HTTP API will be blocked as mixed content by the browser.
-Fix: request an ACM certificate for a domain you control, add an HTTPS
-listener, and point `VITE_API_BASE` at it. **Without a domain this will not
-work in a browser** — it is the one gap between this setup and a working
-public site.
+**The API is proxied through CloudFront, deliberately.** The ALB only speaks
+HTTP, and a browser on an HTTPS page blocks HTTP calls as mixed content. Rather
+than buying a domain and an ACM certificate, CloudFront serves `/api/*` from
+the ALB as a second origin: the browser sees only HTTPS, and CloudFront reaches
+the ALB over HTTP inside AWS. A CloudFront Function strips the `/api` prefix
+before it hits the ALB.
+
+The ALB stays publicly reachable on HTTP. Lock it to CloudFront's prefix list
+if that matters.
 
 **CORS is `allow_origins=["*"]`** in `server/main.py`. Tighten it to the
 CloudFront domain once you know it. `/rag/chat` is unauthenticated and spends

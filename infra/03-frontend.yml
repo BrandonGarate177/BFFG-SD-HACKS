@@ -6,7 +6,31 @@ Description: >
   The tiles are a separate bucket so a frontend rebuild does not re-upload
   73 MB, and so tile caching can outlive app deploys.
 
+Parameters:
+  AlbDnsName:
+    Type: String
+    Description: >
+      ApiUrl host from the server stack. CloudFront proxies /api/* to it over
+      HTTP, so the browser only ever speaks HTTPS to CloudFront and there is
+      no mixed-content block and no certificate to buy.
+
 Resources:
+  StripApiPrefix:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub bffg-strip-api-${AWS::AccountId}
+      AutoPublish: true
+      FunctionConfig:
+        Comment: rewrite /api/foo -> /foo before hitting the ALB
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var r = event.request;
+          r.uri = r.uri.replace(/^\/api/, '');
+          if (r.uri === '') { r.uri = '/'; }
+          return r;
+        }
+
   SiteBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -37,6 +61,38 @@ Resources:
             ExposedHeaders: [Content-Length, Content-Range, ETag, Accept-Ranges]
             MaxAge: 3000
 
+  # The managed CachingOptimized policy keeps no headers in the cache key, so
+  # whichever request populates /tiles/* first has its response replayed for
+  # everyone after. If that request carried no Origin header, S3 returned no
+  # CORS headers, and the cached copy then fails every cross-origin read with
+  # "Access-Control-Allow-Origin missing" — while the bucket itself is
+  # configured correctly, which sends you looking in the wrong place.
+  #
+  # Same-origin production traffic never notices. Anything else — a local
+  # `vite preview` against the deployed tiles, another host, a notebook — does.
+  TilesCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub bffg-tiles-cors-${AWS::AccountId}
+        MinTTL: 1
+        DefaultTTL: 86400
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          # PMTiles are gzipped internally; re-encoding corrupts byte ranges.
+          EnableAcceptEncodingGzip: false
+          EnableAcceptEncodingBrotli: false
+          HeadersConfig:
+            HeaderBehavior: whitelist
+            Headers:
+              - Origin
+              - Access-Control-Request-Headers
+              - Access-Control-Request-Method
+          CookiesConfig:
+            CookieBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
   OriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -62,6 +118,12 @@ Resources:
             DomainName: !GetAtt TilesBucket.RegionalDomainName
             OriginAccessControlId: !GetAtt OriginAccessControl.Id
             S3OriginConfig: {}
+          - Id: api
+            DomainName: !Ref AlbDnsName
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+              HTTPPort: 80
+              OriginReadTimeout: 60
         DefaultCacheBehavior:
           TargetOriginId: site
           ViewerProtocolPolicy: redirect-to-https
@@ -72,12 +134,26 @@ Resources:
           - PathPattern: /tiles/*
             TargetOriginId: tiles
             ViewerProtocolPolicy: redirect-to-https
-            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachePolicyId: !Ref TilesCachePolicy
             # CORS-S3Origin: forwards Origin + the Range header, which is
             # what makes PMTiles work at all.
             OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
             # Already gzip-compressed internally; re-compressing breaks ranges.
             Compress: false
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            # CachingDisabled - every API response is dynamic
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AllViewerExceptHostHeader: forwards the body, query and headers
+            # the API needs, and keeps Host as the ALB rather than CloudFront.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            Compress: true
+            FunctionAssociations:
+              - EventType: viewer-request
+                FunctionARN: !GetAtt StripApiPrefix.FunctionMetadata.FunctionARN
         CustomErrorResponses:
           # BrowserRouter: /parcel/:apn is not an object in S3, so S3 returns
           # 403 (not 404, because ListBucket is denied). Both must serve the
@@ -130,3 +206,6 @@ Outputs:
     Value: !Sub https://${Distribution.DomainName}
   TilesUrl:
     Value: !Sub https://${Distribution.DomainName}/tiles/parcels.pmtiles
+  ApiUrl:
+    Value: !Sub https://${Distribution.DomainName}/api
+    Description: HTTPS API via CloudFront. Use this as VITE_API_BASE.
