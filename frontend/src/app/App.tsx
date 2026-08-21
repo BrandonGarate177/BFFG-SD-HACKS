@@ -12,6 +12,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MapPage />} />
+        {/* apn is optional: /parcel opens the finder, /parcel/:apn the detail. */}
+        <Route path="/parcel" element={<InsightsPage />} />
         <Route path="/parcel/:apn" element={<InsightsPage />} />
       </Routes>
     </BrowserRouter>

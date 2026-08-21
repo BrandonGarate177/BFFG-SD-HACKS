@@ -1,11 +1,22 @@
 import type { Archetype } from "../../shared/domain/archetype";
 
-/** Mirrors server/models.py. Private to the Insights feature. */
+/**
+ * Hand-mirrored from server/models.py. If the server's response models
+ * change, this file changes in the same PR.
+ *
+ * Every field can be null — the real data has gaps (cap_* is null in
+ * non-residential zones, ~15.4% of parcels). Never assume presence.
+ */
 
 export type ArchetypePrediction = {
   median_days: number | null;
   prob_issued_180d: number | null;
   prob_issued_365d: number | null;
+  /**
+   * Building permit only — plan check, inspection, two fixed submittal fees.
+   * A FLOOR, not project cost. There is no construction-cost model in this
+   * dataset. Never relabel this as "estimated cost".
+   */
   permit_fee_usd: number | null;
   owes_dif: boolean | null;
 };
@@ -21,6 +32,27 @@ export type ParcelCapacity = {
   delta_units_with_bonus: number | null;
 };
 
+export type ParcelContext = {
+  zone: string | null;
+  nucleus_use_cd: string | null;
+  /**
+   * Situs (address) community, NOT permitting jurisdiction. 24 uppercase
+   * values; 359,754 are SAN DIEGO but it also contains ESCONDIDO, SANTEE,
+   * LA MESA and RANCHO SANTA FE — parcels zoned by the City whose address
+   * falls elsewhere. Do not label this "jurisdiction".
+   */
+  situs_community: string | null;
+  situs_zip: string | null;
+  lot_sqft: number | null;
+  existing_units: number | null;
+  /** CST-APP | N-APP-1 | N-APP-2 | CST-PMT | DEF-CER | CSTZB | null */
+  coastal_zone: string | null;
+  in_coastal_overlay: boolean | null;
+  coastal_deferred_certification: boolean | null;
+  adu_eligible: boolean | null;
+  sb9_eligible: boolean | null;
+};
+
 export type ModelInfo = {
   source: string;
   model_c_index: number;
@@ -28,19 +60,70 @@ export type ModelInfo = {
   disclaimer: string;
 };
 
+/** GET /model-info — predictions_meta.json verbatim. */
+export type ModelMeta = {
+  generated_at: string;
+  as_of_date: string;
+  parcels: number;
+  archetypes: Archetype[];
+  rows: number;
+  model_c_index: number;
+  model_trained_at: string;
+};
+
+export type RagSource = "live" | "mock" | "error";
+
 export type RagResult = {
+  /**
+   * With the Gradio client these are bullet/numbered lines regexed OUT of
+   * the markdown answer, so they are a SUBSET of sentiment_summary — the
+   * UI must not render both verbatim. See RagPanel.
+   */
   reasons: string[];
+  /** Full markdown chat answer from the Gradio ChatInterface. */
   sentiment_summary: string;
-  source: "live" | "mock" | "error";
+  source: RagSource;
   error?: string | null;
 };
 
 export type ParcelDetail = {
   apn: string;
-  parcel: Record<string, unknown>;
+  parcel: ParcelContext;
   capacity: ParcelCapacity;
   /** All four archetypes arrive at once. */
   predictions: Record<Archetype, ArchetypePrediction>;
   model_info: ModelInfo;
   rag_result: RagResult;
+};
+
+/** POST /search */
+export type SearchRequest = {
+  archetype: Archetype;
+  /** Matched against permit_fee_usd — a fee floor, not project cost. */
+  budget_usd: number;
+  timeframe_months: number;
+  community?: string;
+  limit?: number;
+};
+
+export type ParcelMatch = {
+  apn: string;
+  archetype: Archetype;
+  median_days: number;
+  permit_fee_usd: number;
+  prob_issued_365d: number | null;
+};
+
+export type SearchResponse = { matches: ParcelMatch[] };
+
+/**
+ * POST /rag/chat — free-form permit Q&A, grounded in permit_type_stats.csv
+ * plus one Claude call. Self-hosted since the Gradio/ngrok bot was retired.
+ */
+export type RagChatRequest = { message: string };
+
+export type RagChatResponse = {
+  answer: string;
+  source: string;
+  error?: string | null;
 };
