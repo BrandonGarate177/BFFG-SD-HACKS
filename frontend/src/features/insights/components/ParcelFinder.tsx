@@ -58,7 +58,7 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
     <section className="rounded-lg border border-edge bg-panel p-5 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm uppercase tracking-wider text-muted">Find a parcel</h2>
-        {!compact && <span className="text-[11px] text-dim">393,755 City of San Diego parcels</span>}
+        {!compact && <span className="text-sm text-dim">393,755 City of San Diego parcels</span>}
       </div>
 
       <form
@@ -83,7 +83,7 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wider text-dim">Project</span>
+              <span className="text-sm uppercase tracking-wider text-dim">Project</span>
               <select className={field} value={archetype} onChange={(e) => setArchetype(e.target.value as Archetype)}>
                 {ARCHETYPES.map((a) => (
                   <option key={a} value={a}>{ARCHETYPE_LABEL[a]}</option>
@@ -91,18 +91,18 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wider text-dim">Max permit fee</span>
+              <span className="text-sm uppercase tracking-wider text-dim">Max permit fee</span>
               <input className={field} type="number" min={0} step={1000} value={feeCap}
                      onChange={(e) => setFeeCap(Number(e.target.value))} />
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wider text-dim">Within (months)</span>
+              <span className="text-sm uppercase tracking-wider text-dim">Within (months)</span>
               <input className={field} type="number" min={1} max={60} value={months}
                      onChange={(e) => setMonths(Number(e.target.value))} />
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wider text-dim">Jurisdiction</span>
-              <input className={field} placeholder="any" value={community}
+              <span className="text-sm uppercase tracking-wider text-dim">Community</span>
+              <input className={field} placeholder="e.g. SAN DIEGO" value={community}
                      onChange={(e) => setCommunity(e.target.value)} />
             </label>
           </div>
@@ -115,7 +115,7 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
             >
               {busy ? "Searching…" : "Search"}
             </button>
-            <span className="text-[11px] text-dim">
+            <span className="text-sm text-dim">
               Permit fee is one flat value per project size, so this cap admits either every
               parcel of that size or none — it does not rank them. Timing is what discriminates.
             </span>
@@ -124,7 +124,7 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
       )}
 
       {error && (
-        <p className="rounded border border-accent/40 bg-accent/5 p-2.5 text-[11px] leading-relaxed">
+        <p className="rounded border border-accent/40 bg-accent/5 p-2.5 text-sm leading-relaxed">
           {error}
         </p>
       )}

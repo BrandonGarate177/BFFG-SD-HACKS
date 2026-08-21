@@ -1,4 +1,3 @@
-import { ARCHETYPE_LABEL, hasThinSupport, type Archetype } from "../../../shared/domain/archetype";
 import type { ModelInfo, ParcelContext } from "../types";
 
 const COASTAL_ZONE_COPY: Record<string, string> = {
@@ -20,11 +19,9 @@ type Item = { severity: "high" | "note"; text: React.ReactNode };
 export function WatchOut({
   parcel,
   modelInfo,
-  archetype,
 }: {
   parcel: ParcelContext;
   modelInfo: ModelInfo;
-  archetype: Archetype;
 }) {
   const items: Item[] = [];
 
@@ -58,25 +55,15 @@ export function WatchOut({
     });
   }
 
-  if (hasThinSupport(archetype)) {
-    items.push({
-      severity: "note",
-      text: (
-        <>
-          Under 1,000 training permits for {ARCHETYPE_LABEL[archetype]} projects. Treat this
-          size as directional.
-        </>
-      ),
-    });
-  }
+  // Thin-support and C-index now sit in the hero, next to the number they
+  // qualify. Repeating them here turned six caveats into noise.
 
   items.push({
     severity: "note",
     text: (
       <>
-        Model C-index <span className="mono text-text">{modelInfo.model_c_index.toFixed(3)}</span>{" "}
-        against 0.500 for chance. It ranks parcels better than chance; much of what drives permit
-        timing — staff capacity, plan quality, revision cycles — is not in the data.
+        Much of what drives permit timing — staff capacity, plan quality, revision cycles — is
+        not in the data.
       </>
     ),
   });
@@ -96,14 +83,14 @@ export function WatchOut({
     <section className="rounded-lg border border-edge bg-panel p-5">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm uppercase tracking-wider text-muted">Watch out</h2>
-        <span className="mono text-[11px] text-dim">as of {modelInfo.predictions_as_of}</span>
+        <span className="mono text-sm text-dim">as of {modelInfo.predictions_as_of}</span>
       </div>
 
       <ul className="mt-4 space-y-2.5">
         {items.map((item, i) => (
           <li
             key={i}
-            className={`rounded border p-2.5 text-[11px] leading-relaxed ${
+            className={`rounded border p-2.5 text-sm leading-relaxed ${
               item.severity === "high"
                 ? "border-accent/50 bg-accent/5"
                 : "border-edge bg-ink/30 text-muted"

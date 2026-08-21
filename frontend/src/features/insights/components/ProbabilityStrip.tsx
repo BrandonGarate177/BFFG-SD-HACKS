@@ -32,7 +32,7 @@ export function ProbabilityStrip({
           style={{ width: `${a * 100}%` }}
         />
       </div>
-      <div className="flex gap-4 text-[11px] text-muted">
+      <div className="flex gap-4 text-sm text-muted">
         {p180 != null && (
           <span>
             <span className="mono text-text">{Math.round(a * 100)}%</span> issued by 6 mo

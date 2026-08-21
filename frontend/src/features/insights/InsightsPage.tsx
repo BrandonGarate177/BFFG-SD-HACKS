@@ -96,7 +96,7 @@ export function InsightsPage() {
 
       {sampleReason && <SampleDataBanner reason={sampleReason} />}
 
-      {!detail && <ParcelFinder />}
+      {!detail && !loading && <ParcelFinder />}
 
       {loading && <p className="text-sm text-dim">Loading…</p>}
 
@@ -120,17 +120,14 @@ export function InsightsPage() {
             onArchetype={setArchetype}
             prediction={detail.predictions[selected]}
             capacity={detail.capacity}
+            parcel={detail.parcel}
             hardCostPerUnit={hardCostPerUnit}
           />
 
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="space-y-6 lg:col-span-3">
               <CapacityPanel capacity={detail.capacity} />
-              <WatchOut
-                parcel={detail.parcel}
-                modelInfo={detail.model_info}
-                archetype={selected}
-              />
+              <WatchOut parcel={detail.parcel} modelInfo={detail.model_info} />
               <ParcelFacts parcel={detail.parcel} />
             </div>
 

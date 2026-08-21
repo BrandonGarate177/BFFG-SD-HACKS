@@ -44,7 +44,7 @@ export function ParcelFacts({ parcel }: { parcel: ParcelContext }) {
       </dl>
 
       {parcel.in_coastal_overlay && (
-        <p className="mt-4 rounded border border-edge bg-ink/40 p-2.5 text-[11px] leading-relaxed">
+        <p className="mt-4 rounded border border-edge bg-ink/40 p-2.5 text-sm leading-relaxed">
           <span className="text-muted">Coastal Overlay</span>
           {parcel.coastal_zone && (
             <>
@@ -56,14 +56,7 @@ export function ParcelFacts({ parcel }: { parcel: ParcelContext }) {
         </p>
       )}
 
-      {parcel.coastal_deferred_certification && (
-        <p className="mt-2 rounded border border-accent/50 bg-accent/5 p-2.5 text-[11px] leading-relaxed">
-          <strong className="text-accent">No certified Local Coastal Program.</strong> The Coastal
-          Commission is the permitting authority here, not the City — by-right capacity is a
-          materially weaker claim on this parcel, and the permit-timing model was trained on
-          City permits.
-        </p>
-      )}
+      {/* Coastal jurisdiction warnings live in WatchOut, not duplicated here. */}
     </section>
   );
 }

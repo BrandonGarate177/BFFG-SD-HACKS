@@ -52,7 +52,7 @@ function contextPrefix(detail: ParcelDetail, archetype: Archetype): string {
   return (
     `Context for this question — do not restate it back to me, and do not contradict these figures. ` +
     `Parcel: ${bits.join(", ")}. ` +
-    `For a ${ARCHETYPE_LABEL[archetype]} project our model predicts: ${predBits.join(", ")}. ` +
+    `For a ${ARCHETYPE_LABEL[archetype]}-scale project our model predicts: ${predBits.join(", ")}. ` +
     `Question: `
   );
 }
@@ -71,7 +71,7 @@ export function ChatRail({
   const [turns, setTurns] = useState<Turn[]>([initial]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Reset when navigating to a different parcel.
   useEffect(() => {
@@ -79,8 +79,13 @@ export function ChatRail({
     setDraft("");
   }, [detail.apn, detail.rag_result]);
 
+  // Scroll the rail itself, never scrollIntoView - that walks every
+  // scrollable ancestor including the window, so a tall answer dragged the
+  // page down past the hero the moment it loaded.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (turns.length <= 1) return;
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [turns]);
 
   async function send(question: string) {
@@ -124,10 +129,14 @@ export function ChatRail({
     <section className="flex max-h-[calc(100vh-6rem)] flex-col rounded-lg border border-edge bg-panel">
       <header className="flex items-baseline justify-between gap-2 border-b border-edge px-5 py-3">
         <h2 className="text-sm uppercase tracking-wider text-muted">Assistant</h2>
-        {notLive && <span className="mono text-[11px] text-accent">not retrieved</span>}
+        {notLive && <span className="mono text-sm text-accent">not retrieved</span>}
       </header>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+      <div
+        ref={listRef}
+        aria-live="polite"
+        className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+      >
         {turns.map((turn, i) =>
           turn.role === "user" ? (
             <p key={i} className="ml-6 rounded-lg bg-edge/50 px-3 py-2 text-sm">
@@ -140,7 +149,7 @@ export function ChatRail({
           ) : (
             <div key={i} className="space-y-1">
               {turn.source && turn.source !== "live" && (
-                <p className="rounded border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-[11px] leading-relaxed">
+                <p className="rounded border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-sm leading-relaxed">
                   {turn.source === "mock"
                     ? "Placeholder — not grounded in the permit statistics."
                     : "The assistant could not be reached."}
@@ -152,7 +161,6 @@ export function ChatRail({
             </div>
           ),
         )}
-        <div ref={endRef} />
       </div>
 
       {!disabled && turns.length <= 1 && (
@@ -161,7 +169,7 @@ export function ChatRail({
             <button
               key={s}
               onClick={() => void send(s)}
-              className="rounded-full border border-edge px-2.5 py-1 text-[11px] text-muted transition-colors hover:border-accent hover:text-text"
+              className="rounded-full border border-edge px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-text"
             >
               {s}
             </button>

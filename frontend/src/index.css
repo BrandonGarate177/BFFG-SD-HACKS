@@ -11,7 +11,9 @@
 
   --color-text: #eaf0fa;
   --color-muted: #9db6d8;
-  --color-dim: #6b8cb8;
+  /* 5.35:1 on --color-panel. #6b8cb8 was 2.94:1 and failed WCAG AA
+     everywhere on the dashboard, which is entirely bg-panel. */
+  --color-dim: #a8bedb;
 }
 
 html, body, #root { height: 100%; }

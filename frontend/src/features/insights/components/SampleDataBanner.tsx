@@ -13,7 +13,7 @@ export function SampleDataBanner({ reason }: { reason: string }) {
         <span className="text-sm text-text">
           Every number on this page is invented. The server could not be reached.
         </span>
-        <span className="mono text-[11px] text-muted">{reason}</span>
+        <span className="mono text-sm text-muted">{reason}</span>
       </div>
     </div>
   );

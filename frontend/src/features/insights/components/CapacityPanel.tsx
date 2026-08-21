@@ -25,17 +25,17 @@ function Path({
     >
       <div className="min-w-0">
         <div className="text-sm">{label}</div>
-        <div className="mono text-[11px] text-dim">{formula}</div>
+        <div className="mono text-sm text-dim">{formula}</div>
       </div>
       <div className="flex items-baseline gap-2 shrink-0">
         <span className={`mono text-lg ${lit ? "text-accent" : "text-muted"}`}>
           {total ?? "—"}
         </span>
         {state === "taken" && (
-          <span className="text-[10px] uppercase tracking-wider text-accent">taken</span>
+          <span className="text-xs uppercase tracking-wider text-accent">taken</span>
         )}
         {state === "tied" && (
-          <span className="text-[10px] uppercase tracking-wider text-accent">equivalent</span>
+          <span className="text-xs uppercase tracking-wider text-accent">equivalent</span>
         )}
       </div>
     </div>
@@ -105,7 +105,7 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
       </dl>
 
       {cap_adu_bonus_max != null && (
-        <p className="mt-4 rounded border border-accent/40 bg-accent/5 p-2.5 text-[11px] leading-relaxed">
+        <p className="mt-4 rounded border border-accent/40 bg-accent/5 p-2.5 text-sm leading-relaxed">
           ADU Bonus ceiling <span className="mono text-accent">{cap_adu_bonus_max}</span> —{" "}
           <strong>not by-right.</strong> Every bonus unit needs a deed-restricted affordable ADU
           plus a Sustainable Development Area location.
