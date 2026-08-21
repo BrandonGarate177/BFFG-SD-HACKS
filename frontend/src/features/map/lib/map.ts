@@ -1,5 +1,20 @@
-import * as maplibregl from "maplibre-gl";
+import * as maplibreNs from "maplibre-gl";
 import type { Map, StyleSpecification } from "maplibre-gl";
+
+/**
+ * maplibre-gl v5 exposes two different shapes depending on how it is
+ * resolved: requiring it (CJS) yields named exports, while importing the ESM
+ * entry yields ONLY a default object. Vite's dev server serves the ESM build
+ * and the production bundler applies interop, so a plain namespace import
+ * works in one and throws "addProtocol is not a function" in the other —
+ * the app builds and deploys fine and the dev server is broken, or vice
+ * versa.
+ *
+ * Reading through `default` when it exists covers both, and survives a bump
+ * back to v6, which drops the default entirely.
+ */
+const maplibregl = ((maplibreNs as unknown as { default?: typeof maplibreNs }).default ??
+  maplibreNs) as typeof maplibreNs;
 import { Protocol } from "pmtiles";
 import { DOT_TO_POLYGON_ZOOM, MAP_MAX_BOUNDS, MAP_MIN_ZOOM, MAP_START, TILES_URL } from "../config";
 import { generateDevParcels } from "./devParcels";
