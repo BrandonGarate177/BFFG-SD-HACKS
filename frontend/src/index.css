@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  /* coolors.co/00296b-003f88-00509d-fdc500-ffd500 */
+  --color-ink: #001a4a;        /* page ground, darkened from 00296b for contrast headroom */
+  --color-deep: #00296b;
+  --color-panel: #003f88;
+  --color-edge: #00509d;
+  --color-accent: #fdc500;
+  --color-accent-hi: #ffd500;
+
+  --color-text: #eaf0fa;
+  --color-muted: #9db6d8;
+  --color-dim: #6b8cb8;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Range inputs: palette track, accent thumb. */
+.range-accent {
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-edge);
+  outline: none;
+}
+.range-accent::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-deep);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+.range-accent::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 999px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-deep);
+  cursor: pointer;
+}
+
+/* MapLibre chrome, so its light defaults don't fight the navy shell. */
+.maplibregl-popup-content {
+  background: var(--color-deep);
+  color: var(--color-text);
+  border: 1px solid var(--color-edge);
+  border-radius: 10px;
+}
+.maplibregl-popup-tip { border-top-color: var(--color-deep) !important; }
+.maplibregl-ctrl-attrib { background: rgba(0,26,74,.72) !important; }
+.maplibregl-ctrl-attrib a { color: var(--color-dim) !important; }
+.maplibregl-ctrl-group {
+  background: var(--color-deep) !important;
+  border: 1px solid var(--color-edge) !important;
+}
+.maplibregl-ctrl-group button + button { border-top-color: var(--color-edge) !important; }
+.maplibregl-ctrl-group button span { filter: invert(1) brightness(1.6); }
+.maplibregl-ctrl-scale {
+  background: rgba(0,26,74,.72) !important;
+  border-color: var(--color-edge) !important;
+  color: var(--color-muted) !important;
+}
