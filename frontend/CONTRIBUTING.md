@@ -58,8 +58,11 @@ That is a change to `server/models.py`, mirrored in
 
 `budget` means different things on each side, deliberately:
 
-- **Map** filters on *estimated construction cost* — `delta_units × hardCostPerUnit`,
-  an adjustable assumption. The dataset does not model construction cost.
+- **Map** filters on *estimated construction cost* — `delta_units ×
+  hardCostPerUnit[archetype]`, an adjustable assumption. The rate is per
+  archetype, so a parcel is priced at its own project size. The dataset does
+  not model construction cost; provenance for the four rates is in
+  `features/map/config.ts`.
 - **Server `/search`** filters on `permit_fee` — real, from the fee schedule,
   and a *floor* (building permit only).
 

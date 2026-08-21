@@ -1,9 +1,19 @@
 import { PROB_1YR_FIELD, type TileParcel } from "../types";
-import { ARCHETYPE_LABEL, ARCHETYPE_SUPPORT, hasThinSupport } from "../../../shared/domain/archetype";
+import {
+  ARCHETYPE_LABEL,
+  ARCHETYPE_SUPPORT,
+  hasThinSupport,
+  type Archetype,
+} from "../../../shared/domain/archetype";
 import { parcelEconomics } from "../lib/cost";
 import { fmtMonths, fmtUSD } from "../../../shared/format";
 
-type Props = { parcel: TileParcel; x: number; y: number; hardCostPerUnit: number };
+type Props = {
+  parcel: TileParcel;
+  x: number;
+  y: number;
+  hardCostPerUnit: Record<Archetype, number>;
+};
 
 /**
  * Hover card. The whiteboard calls for value / income / residents; assessed

@@ -1,4 +1,4 @@
-import { COST_ASSUMPTIONS } from "../config";
+import { HARD_COST_PER_UNIT } from "../config";
 import { PRED_DAYS_FIELD, type TileParcel } from "../types";
 import { archetypeForUnits, type Archetype } from "../../../shared/domain/archetype";
 import { daysToMonths } from "../../../shared/format";
@@ -6,8 +6,10 @@ import { daysToMonths } from "../../../shared/format";
 /**
  * Estimated construction cost to build a parcel to its by-right capacity.
  *
- * This is arithmetic over a stated assumption, NOT a model output. See the
- * note in config.ts. It deliberately excludes:
+ * This is arithmetic over a stated assumption, NOT a model output. The rate
+ * is chosen by the parcel's own archetype, so a 1-unit ADU and a 5-unit
+ * building are not priced at the same figure per door. See the note in
+ * config.ts for where each rate comes from. It deliberately excludes:
  *   - permit_fee and Development Impact Fees (not in the tile schema; they
  *     live in predictions.parquet and surface on the detail page)
  *   - land acquisition (no assessed value in the tile export)
@@ -15,8 +17,8 @@ import { daysToMonths } from "../../../shared/format";
  *
  * It is therefore a FLOOR on total project cost, and the UI says so.
  */
-export function estimatedCost(units: number, hardCostPerUnit: number): number {
-  return units * hardCostPerUnit;
+export function estimatedCost(units: number, hardCostPerUnit: Record<Archetype, number>): number {
+  return units * hardCostPerUnit[archetypeForUnits(units)];
 }
 
 /** Units a parcel yields when built to capacity. Null capacity means no answer. */
@@ -38,7 +40,7 @@ export type ParcelEconomics = {
  */
 export function parcelEconomics(
   p: TileParcel,
-  hardCostPerUnit: number = COST_ASSUMPTIONS.hardCostPerUnit,
+  hardCostPerUnit: Record<Archetype, number> = HARD_COST_PER_UNIT,
 ): ParcelEconomics | null {
   const units = buildableUnits(p);
   if (units == null) return null;
