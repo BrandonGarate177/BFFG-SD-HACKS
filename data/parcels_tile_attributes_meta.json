@@ -1,0 +1,25 @@
+{
+  "parcels": 393755,
+  "columns": [
+    "apn",
+    "zone",
+    "situs_community",
+    "lot_sqft",
+    "existing_units",
+    "delta_units",
+    "adu_eligible",
+    "sb9_eligible",
+    "in_coastal_overlay",
+    "coastal_deferred_certification",
+    "pred_days_3_4_unit",
+    "pred_days_5plus",
+    "pred_days_adu",
+    "pred_days_duplex",
+    "prob_1yr_3_4_unit",
+    "prob_1yr_5plus",
+    "prob_1yr_adu",
+    "prob_1yr_duplex"
+  ],
+  "join_key": "apn",
+  "source": "predictions.parquet"
+}

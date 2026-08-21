@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-08-21T06:15:54.961390+00:00",
+  "as_of_date": "2026-08-20",
+  "parcels": 393755,
+  "archetypes": [
+    "adu",
+    "duplex",
+    "3_4_unit",
+    "5plus"
+  ],
+  "rows": 1575020,
+  "model_c_index": 0.612108348640536,
+  "model_trained_at": "2026-08-21T04:38:07.562065+00:00"
+}
