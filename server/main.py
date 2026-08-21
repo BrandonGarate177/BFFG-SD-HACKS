@@ -98,6 +98,13 @@ async def rag_chat_ws(websocket: WebSocket) -> None:
     {"type": "ping"} every WS_PING_INTERVAL_SECONDS instead of blocking
     forever, so the connection doesn't sit silent long enough for a proxy's
     idle timeout to kill it.
+
+    The answer itself is sent as a bare JSON string — just the answer, no
+    source/error wrapper. That means the client has no way to tell a mock
+    answer from a live one over this connection; if ANTHROPIC_API_KEY is
+    unset server-side, callers here get a mock answer with nothing marking
+    it as such (unlike POST /rag/chat and /parcel-detail, which still
+    report source/error).
     """
     await websocket.accept()
     messages: list[dict[str, str]] = []
@@ -118,7 +125,7 @@ async def rag_chat_ws(websocket: WebSocket) -> None:
             messages.append({"role": "user", "content": question})
             result = await permit_rag.answer_conversation(messages)
             messages.append({"role": "assistant", "content": result["answer"]})
-            await websocket.send_json({"type": "answer", **result})
+            await websocket.send_json(result["answer"])
     except WebSocketDisconnect:
         pass
 
