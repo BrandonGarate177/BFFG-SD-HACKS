@@ -1,0 +1,31 @@
+name: Deploy tiles
+
+# Manual only. parcels.pmtiles is 73 MB and changes about never, so this is
+# not worth running on every push.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload PMTiles
+        run: |
+          aws s3 cp frontend/public/parcels.pmtiles \
+            "s3://${{ vars.TILES_BUCKET }}/tiles/parcels.pmtiles" \
+            --content-type application/octet-stream \
+            --cache-control "public,max-age=31536000,immutable"
