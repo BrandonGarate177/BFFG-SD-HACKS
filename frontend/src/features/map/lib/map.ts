@@ -85,7 +85,9 @@ export function createMap(container: HTMLDivElement): Map {
     });
 
     // Below the zoom where lots are legible, draw centroids instead.
-    map.addLayer({
+    // Only meaningful for the generated centroid source. Vector tiles hold
+    // polygons, and a circle layer renders nothing for polygon geometry.
+    if (!TILES_URL) map.addLayer({
       id: L_MATCH_DOTS,
       type: "circle",
       source: dotsSource,
@@ -105,7 +107,9 @@ export function createMap(container: HTMLDivElement): Map {
       type: "fill",
       source: SRC,
       ...vectorLayer,
-      minzoom: DOT_TO_POLYGON_ZOOM,
+      // No minzoom when real tiles are in play: the fill is the only
+      // highlight layer, so gating it would blank the citywide view.
+      ...(TILES_URL ? {} : { minzoom: DOT_TO_POLYGON_ZOOM }),
       paint: {
         "fill-color": CAPACITY_COLOR as never,
         "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.95, 0.72],
@@ -137,4 +141,8 @@ export function setSelected(map: Map, apn: string | null): void {
   map.setFilter(L_SELECTED, ["==", ["get", "apn"], apn ?? ""] as never);
 }
 
-export const INTERACTIVE_LAYERS = [L_MATCH_DOTS, L_MATCH_POLY];
+// The dots layer only exists on the generated-geometry path, so hover and
+// click handlers must not be bound to it when real tiles are in play.
+export const INTERACTIVE_LAYERS = TILES_URL
+  ? [L_MATCH_POLY]
+  : [L_MATCH_DOTS, L_MATCH_POLY];
