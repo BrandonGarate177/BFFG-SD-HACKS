@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiUnavailable } from "../../shared/api/client";
 import { API_BASE } from "../../shared/config";
 import { archetypeForUnits, type Archetype } from "../../shared/domain/archetype";
-import { fetchParcelDetail } from "./lib/api";
+import { fetchParcelDetail, fetchParcelRag } from "./lib/api";
 import { SAMPLE_PARCEL_DETAIL } from "./lib/fixture";
 import { CapacityPanel } from "./components/CapacityPanel";
 import { HeroAnswer } from "./components/HeroAnswer";
@@ -12,7 +12,7 @@ import { ParcelFinder } from "./components/ParcelFinder";
 import { ChatRail } from "./components/ChatRail";
 import { SampleDataBanner } from "./components/SampleDataBanner";
 import { WatchOut } from "./components/WatchOut";
-import type { ParcelDetail } from "./types";
+import type { ParcelDetail, RagResult } from "./types";
 
 export function InsightsPage() {
   const { apn } = useParams();
@@ -21,6 +21,12 @@ export function InsightsPage() {
   const [unavailable, setUnavailable] = useState<string | null>(null);
   /** Non-null when `detail` is the fixture rather than a real response. */
   const [sampleReason, setSampleReason] = useState<string | null>(null);
+  /**
+   * The parcel narrative, fetched separately from the detail. Null means
+   * still in flight - the rail shows a pending turn rather than the page
+   * withholding every number until Claude answers.
+   */
+  const [rag, setRag] = useState<RagResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [archetype, setArchetype] = useState<Archetype | null>(null);
 
@@ -35,6 +41,7 @@ export function InsightsPage() {
     if (!apn) {
       setDetail(null);
       setUnavailable(null);
+      setRag(null);
       return;
     }
     let cancelled = false;
@@ -42,11 +49,34 @@ export function InsightsPage() {
     setUnavailable(null);
     setSampleReason(null);
     setArchetype(null);
+    setRag(null);
     setLoading(true);
 
     fetchParcelDetail(apn)
       .then((d) => {
-        if (!cancelled) setDetail(d);
+        if (cancelled) return;
+        setDetail(d);
+
+        // Only now, and deliberately not in parallel: on the failure path
+        // below we fall back to the fixture's own narrative, and a second
+        // in-flight request would race it. The detail resolves in under a
+        // millisecond, so chaining costs nothing and skips a guaranteed 404
+        // for an apn outside the dataset.
+        fetchParcelRag(apn)
+          .then((r) => {
+            if (!cancelled) setRag(r);
+          })
+          .catch((e: unknown) => {
+            if (cancelled) return;
+            // Resolve the pending turn into a visible failure. Leaving it
+            // null would spin the rail forever.
+            setRag({
+              reasons: [],
+              sentiment_summary: "Could not load the assistant's read on this parcel.",
+              source: "error",
+              error: e instanceof ApiUnavailable ? e.message : String(e),
+            });
+          });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -58,6 +88,9 @@ export function InsightsPage() {
         if (!msg.startsWith("Not found")) {
           setDetail({ ...SAMPLE_PARCEL_DETAIL, apn });
           setSampleReason(msg);
+          // The fixture carries its own narrative. Without this the rail
+          // would sit pending forever, since /parcel-rag is unreachable too.
+          setRag(SAMPLE_PARCEL_DETAIL.rag_result ?? null);
         }
       })
       .finally(() => !cancelled && setLoading(false));
@@ -135,6 +168,7 @@ export function InsightsPage() {
               <div className="lg:sticky lg:top-6">
                 <ChatRail
                   detail={detail}
+                  rag={rag}
                   archetype={selected}
                   disabled={Boolean(sampleReason)}
                 />

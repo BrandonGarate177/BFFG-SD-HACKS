@@ -93,7 +93,12 @@ export type ParcelDetail = {
   /** All four archetypes arrive at once. */
   predictions: Record<Archetype, ArchetypePrediction>;
   model_info: ModelInfo;
-  rag_result: RagResult;
+  /**
+   * Absent until POST /parcel-rag answers. The server stopped bundling it
+   * into /parcel-detail because that Claude call took 4-6s while every
+   * other field here is an in-memory lookup - the page renders without it.
+   */
+  rag_result?: RagResult | null;
 };
 
 /** POST /search */

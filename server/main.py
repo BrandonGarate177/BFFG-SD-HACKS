@@ -53,8 +53,6 @@ async def parcel_detail(request: ParcelDetailRequest) -> ParcelDetailResponse:
     if parcel is None:
         raise HTTPException(status_code=404, detail=f"Unknown apn: {request.apn}")
 
-    rag_raw = await rag_client.get_rag_context(parcel)
-
     return ParcelDetailResponse(
         apn=parcel["apn"],
         parcel=parcel["parcel"],
@@ -67,8 +65,28 @@ async def parcel_detail(request: ParcelDetailRequest) -> ParcelDetailResponse:
             model_c_index=parcel_lookup.MODEL_INFO["model_c_index"],
             predictions_as_of=parcel_lookup.MODEL_INFO["as_of_date"],
         ),
-        rag_result=RagResult(**rag_raw),
     )
+
+
+@app.post("/parcel-rag", response_model=RagResult)
+async def parcel_rag(request: ParcelDetailRequest) -> RagResult:
+    """The narrative half of /parcel-detail, split out so it can't hold the
+    page hostage.
+
+    Composing this is a Claude call - 4-6s measured - while everything else
+    /parcel-detail returns is an in-memory lookup taking well under a
+    millisecond. Serving them together meant the whole Insights page waited
+    on prose it doesn't need to render a single number.
+
+    Same 404 as /parcel-detail for an apn outside the dataset, and the same
+    never-raises contract: rag_client falls back to a mock on any failure, so
+    a client only has to handle transport errors.
+    """
+    parcel = parcel_lookup.get_parcel(request.apn)
+    if parcel is None:
+        raise HTTPException(status_code=404, detail=f"Unknown apn: {request.apn}")
+
+    return RagResult(**await rag_client.get_rag_context(parcel))
 
 
 @app.get("/model-info")
