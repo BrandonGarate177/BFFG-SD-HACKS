@@ -1,40 +1,40 @@
-import json
-from pathlib import Path
-from typing import Any
+from typing import Optional
 
+import pandas as pd
+
+import parcel_lookup
 from models import ParcelMatch
 
-PREDICTIONS_PATH = Path(__file__).parent / "sample_precomputed_predictions.json"
-
-_predictions: dict[str, dict[str, Any]] = {}
+DAYS_PER_MONTH = 30.44  # same day/month convention as the housing-capacity pipeline
 
 
-def _load() -> None:
-    with open(PREDICTIONS_PATH, encoding="utf-8") as f:
-        _predictions.update(json.load(f))
+def filter_parcels(
+    archetype: str,
+    budget_usd: float,
+    timeframe_months: float,
+    community: Optional[str] = None,
+    limit: int = 200,
+) -> list[ParcelMatch]:
+    """Filters the real predictions frame in place. budget_usd is matched against
+    permit_fee (a fee floor, not full construction cost — see data/README.md)."""
+    df = parcel_lookup.get_dataframe()
+    mask = (
+        (df["archetype"] == archetype)
+        & (df["permit_fee"] <= budget_usd)
+        & (df["median_days"] <= timeframe_months * DAYS_PER_MONTH)
+    )
+    if community:
+        mask &= df["situs_community"] == community.strip()
 
+    matches = df[mask].sort_values("permit_fee").head(limit)
 
-_load()
-
-
-def get_prediction(parcel_id: str) -> dict[str, Any] | None:
-    return _predictions.get(parcel_id)
-
-
-def filter_parcels(budget_usd: float, timeframe_months: float) -> list[ParcelMatch]:
-    matches = []
-    for parcel_id, prediction in _predictions.items():
-        if (
-            prediction["predicted_cost_usd"] <= budget_usd
-            and prediction["predicted_time_months"] <= timeframe_months
-        ):
-            matches.append(
-                ParcelMatch(
-                    parcel_id=parcel_id,
-                    predicted_time_months=prediction["predicted_time_months"],
-                    predicted_cost_usd=prediction["predicted_cost_usd"],
-                )
-            )
-
-    matches.sort(key=lambda m: m.predicted_cost_usd)
-    return matches
+    return [
+        ParcelMatch(
+            apn=row.apn,
+            archetype=row.archetype,
+            median_days=row.median_days,
+            permit_fee_usd=row.permit_fee,
+            prob_issued_365d=None if pd.isna(row.prob_issued_365d) else float(row.prob_issued_365d),
+        )
+        for row in matches.itertuples(index=False)
+    ]

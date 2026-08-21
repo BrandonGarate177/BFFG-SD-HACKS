@@ -1,17 +1,24 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
+Archetype = Literal["adu", "duplex", "3_4_unit", "5plus"]
+
 
 class SearchRequest(BaseModel):
-    budget_usd: float
+    archetype: Archetype
+    budget_usd: float  # matched against permit_fee_usd, a fee floor — see data/README.md
     timeframe_months: float
+    community: Optional[str] = None
+    limit: int = 200
 
 
 class ParcelMatch(BaseModel):
-    parcel_id: str
-    predicted_time_months: float
-    predicted_cost_usd: float
+    apn: str
+    archetype: Archetype
+    median_days: float
+    permit_fee_usd: float
+    prob_issued_365d: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -19,14 +26,36 @@ class SearchResponse(BaseModel):
 
 
 class ParcelDetailRequest(BaseModel):
-    parcel_id: str
+    apn: str
 
 
-class MlResult(BaseModel):
-    predicted_time_months: float
-    predicted_cost_usd: float
-    source: str
-    error: Optional[str] = None
+class ArchetypePrediction(BaseModel):
+    median_days: Optional[float] = None
+    prob_issued_180d: Optional[float] = None
+    prob_issued_365d: Optional[float] = None
+    permit_fee_usd: Optional[float] = None
+    owes_dif: Optional[bool] = None
+
+
+class ParcelCapacity(BaseModel):
+    cap_base: Optional[float] = None
+    cap_adu: Optional[float] = None
+    cap_jadu: Optional[float] = None
+    cap_sb9: Optional[float] = None
+    cap_total: Optional[float] = None
+    delta_units: Optional[float] = None
+    cap_adu_bonus_max: Optional[float] = None
+    delta_units_with_bonus: Optional[float] = None
+
+
+class ModelInfo(BaseModel):
+    source: str = "precomputed"
+    model_c_index: float
+    predictions_as_of: str
+    disclaimer: str = (
+        "Ranks parcels better than chance (C-index above), not a commitment. "
+        "Based on historical permits, not a forecast."
+    )
 
 
 class RagResult(BaseModel):
@@ -37,7 +66,16 @@ class RagResult(BaseModel):
 
 
 class ParcelDetailResponse(BaseModel):
-    parcel_id: str
+    apn: str
     parcel: dict[str, Any]
-    ml_result: MlResult
+    capacity: ParcelCapacity
+    predictions: dict[str, ArchetypePrediction]
+    model_info: ModelInfo
     rag_result: RagResult
+
+
+class MlBulkUploadResponse(BaseModel):
+    status: str
+    rows_received: int
+    source: str
+    error: Optional[str] = None
