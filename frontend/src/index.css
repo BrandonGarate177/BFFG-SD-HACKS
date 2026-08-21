@@ -30,6 +30,9 @@ body {
 }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+/* Tailwind's list-none does not reach Safari's own disclosure triangle. */
+summary::-webkit-details-marker { display: none; }
+
 /* Range inputs: palette track, accent thumb. */
 .range-accent {
   appearance: none;
