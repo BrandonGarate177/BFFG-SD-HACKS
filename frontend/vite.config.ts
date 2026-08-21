@@ -29,8 +29,12 @@ function maplibreWorker(): Plugin {
     apply: "build",
     closeBundle() {
       const src = resolve(here, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs");
+      // maplibre-gl v5 inlines its worker into the main bundle and ships no
+      // such file; only v6 emits a separate one. Skip rather than fail, so
+      // this keeps working across either version.
       if (!existsSync(src)) {
-        this.error(`maplibre worker not found at ${src} — the map will silently render no tiles`);
+        console.log("  maplibre worker is inlined in this version — nothing to copy");
+        return;
       }
       const dest = resolve(here, "dist/assets/maplibre-gl-worker.mjs");
       mkdirSync(dirname(dest), { recursive: true });
