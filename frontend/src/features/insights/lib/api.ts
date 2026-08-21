@@ -3,6 +3,7 @@ import type {
   ModelMeta,
   ParcelDetail,
   RagChatResponse,
+  RagResult,
   SearchRequest,
   SearchResponse,
 } from "../types";
@@ -21,6 +22,17 @@ export function fetchParcelDetail(apn: string): Promise<ParcelDetail> {
  */
 export function searchParcels(req: SearchRequest): Promise<SearchResponse> {
   return post<SearchResponse>("/search", { limit: 25, ...req });
+}
+
+/**
+ * POST /parcel-rag — the narrative /parcel-detail used to bundle.
+ *
+ * Split out because composing it is a Claude call (4-6s) and everything
+ * else on the page is an in-memory lookup. Fire it after the detail lands,
+ * never before - the page must not wait on this.
+ */
+export function fetchParcelRag(apn: string): Promise<RagResult> {
+  return post<RagResult>("/parcel-rag", { apn });
 }
 
 /** GET /model-info — predictions_meta.json verbatim. */

@@ -71,16 +71,25 @@ function contextPrefix(detail: ParcelDetail, archetype: Archetype): string {
 
 export function ChatRail({
   detail,
+  rag,
   archetype,
   disabled,
 }: {
   detail: ParcelDetail;
+  /**
+   * The opening narrative, from POST /parcel-rag. Null while that request
+   * is in flight - the rail opens on a pending turn rather than the page
+   * withholding every number until Claude answers.
+   */
+  rag: RagResult | null;
   archetype: Archetype;
   /** True in sample-data mode - the server is unreachable, so no asking. */
   disabled?: boolean;
 }) {
-  const initial = openingTurn(detail.rag_result);
-  const [turns, setTurns] = useState<Turn[]>([initial]);
+  // The conversation only. The opening turn is DERIVED from `rag` below
+  // rather than seeded into here, so it can never drift from the prop and
+  // the socket handlers can't reach it.
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -90,11 +99,12 @@ export function ChatRail({
   // exactly when someone clicks a suggestion chip.
   const queuedRef = useRef<string | null>(null);
 
-  // Reset when navigating to a different parcel.
+  // Reset when navigating to a different parcel. The opening turn needs no
+  // reset - it tracks `rag`, which the page nulls for the new apn.
   useEffect(() => {
-    setTurns([openingTurn(detail.rag_result)]);
+    setTurns([]);
     setDraft("");
-  }, [detail.apn, detail.rag_result]);
+  }, [detail.apn]);
 
   /**
    * Ends the in-flight turn with an error, replacing the half-streamed text.
@@ -169,7 +179,7 @@ export function ChatRail({
   // scrollable ancestor including the window, so a tall answer dragged the
   // page down past the hero the moment it loaded.
   useEffect(() => {
-    if (turns.length <= 1) return;
+    if (turns.length === 0) return;
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns]);
@@ -203,7 +213,10 @@ export function ChatRail({
     ]);
   }
 
-  const notLive = turns.some((t) => t.role === "assistant" && t.source && t.source !== "live");
+  // Pending until /parcel-rag answers; the rail shows "Thinking…" in its
+  // place rather than the whole page waiting on that call.
+  const shown: Turn[] = [rag ? openingTurn(rag) : PENDING_OPENING, ...turns];
+  const notLive = shown.some((t) => t.role === "assistant" && t.source && t.source !== "live");
 
   return (
     <section className="flex max-h-[calc(100vh-6rem)] flex-col rounded-lg border border-edge bg-panel">
@@ -217,7 +230,7 @@ export function ChatRail({
         aria-live="polite"
         className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
       >
-        {turns.map((turn, i) =>
+        {shown.map((turn, i) =>
           turn.role === "user" ? (
             <p key={i} className="ml-6 rounded-lg bg-edge/50 px-3 py-2 text-sm">
               {turn.text}
@@ -245,7 +258,7 @@ export function ChatRail({
         )}
       </div>
 
-      {!disabled && turns.length <= 1 && (
+      {!disabled && turns.length === 0 && (
         <div className="flex flex-wrap gap-1.5 border-t border-edge px-5 py-3">
           {SUGGESTIONS.map((s) => (
             <button
@@ -286,8 +299,21 @@ export function ChatRail({
 }
 
 /**
- * The server already composed and answered one parcel-specific question for
- * /parcel-detail, so the conversation opens with it rather than an empty box.
+ * Stands in for the opening turn until /parcel-rag answers. Frozen because
+ * it is shared by every mount rather than rebuilt per render.
+ */
+const PENDING_OPENING: Turn = Object.freeze({
+  role: "assistant",
+  text: "",
+  pending: true,
+});
+
+/**
+ * The server composes one parcel-specific question and answer of its own, so
+ * the conversation opens with it rather than an empty box. It arrives from
+ * POST /parcel-rag, separately from the parcel itself - bundling the two put
+ * a 4-6s Claude call in front of every number on the page.
+ *
  * `reasons` is regexed out of that same text server-side, so only the full
  * answer is rendered - printing both would duplicate every bullet.
  */

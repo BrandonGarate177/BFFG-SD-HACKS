@@ -75,7 +75,11 @@ class ParcelDetailResponse(BaseModel):
     capacity: ParcelCapacity
     predictions: dict[str, ArchetypePrediction]
     model_info: ModelInfo
-    rag_result: RagResult
+    # Absent by design. Composing this needs a Claude call, which took 4-6s
+    # while every other field here comes out of memory in under a
+    # millisecond - so the page no longer waits on it. Clients fetch it from
+    # POST /parcel-rag once the parcel itself has rendered.
+    rag_result: Optional[RagResult] = None
 
 
 class RagChatRequest(BaseModel):
