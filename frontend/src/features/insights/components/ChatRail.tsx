@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
-import { ApiUnavailable } from "../../../shared/api/client";
+import { API_BASE } from "../../../shared/config";
 import { ARCHETYPE_LABEL, type Archetype } from "../../../shared/domain/archetype";
 import { daysToMonths } from "../../../shared/format";
-import { askRag } from "../lib/api";
 import type { ParcelDetail, RagResult } from "../types";
 
 type Turn = {
@@ -14,11 +13,24 @@ type Turn = {
   pending?: boolean;
 };
 
+/** One frame from /ws/rag/chat. See rag_chat_ws in server/main.py. */
+type WsEvent = {
+  type: "chunk" | "done" | "ping";
+  /** "chunk": the next piece of the answer, to append to what came before. */
+  text?: string;
+  /** "done": "live" | "mock" | "error". */
+  source?: string;
+  /** "done": set when the model call failed, even if text still arrived. */
+  error?: string | null;
+};
+
 const SUGGESTIONS = [
   "Why does this take longer than a typical ADU?",
   "What fees am I not seeing here?",
   "What would speed this up?",
 ];
+
+const UNREACHABLE = "Could not reach the assistant.";
 
 /**
  * Builds the context prefix sent with every question.
@@ -72,12 +84,86 @@ export function ChatRail({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  // A question asked while the socket is still CONNECTING, flushed on open.
+  // Without this the first question after page load is dropped, which is
+  // exactly when someone clicks a suggestion chip.
+  const queuedRef = useRef<string | null>(null);
 
   // Reset when navigating to a different parcel.
   useEffect(() => {
     setTurns([openingTurn(detail.rag_result)]);
     setDraft("");
   }, [detail.apn, detail.rag_result]);
+
+  /**
+   * Ends the in-flight turn with an error, replacing the half-streamed text.
+   * No-ops when nothing is pending - onclose also fires on ordinary unmount
+   * and on the socket we deliberately close when the parcel changes.
+   */
+  const failPending = useCallback((text: string) => {
+    setTurns((t) => {
+      const last = t[t.length - 1];
+      if (!last?.pending) return t;
+      return [...t.slice(0, -1), { role: "assistant", text, source: "error" }];
+    });
+    setBusy(false);
+  }, []);
+
+  // One socket per parcel. The server keeps the conversation history on the
+  // connection, so reconnecting is also what scopes that history to this
+  // parcel - a new APN must not inherit the last one's follow-ups.
+  useEffect(() => {
+    if (disabled) return;
+
+    const ws = new WebSocket(`${API_BASE.replace(/^http/, "ws")}/ws/rag/chat`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      const queued = queuedRef.current;
+      queuedRef.current = null;
+      if (queued) ws.send(JSON.stringify({ message: queued }));
+    };
+
+    ws.onmessage = (evt) => {
+      const msg: WsEvent = JSON.parse(evt.data);
+      if (msg.type === "ping") return;
+
+      if (msg.type === "chunk") {
+        const text = msg.text ?? "";
+        setTurns((t) => {
+          const last = t[t.length - 1];
+          if (!last?.pending) return t;
+          return [...t.slice(0, -1), { ...last, text: last.text + text }];
+        });
+        return;
+      }
+
+      if (msg.type === "done") {
+        setTurns((t) => {
+          const last = t[t.length - 1];
+          if (!last?.pending) return t;
+          return [...t.slice(0, -1), { ...last, pending: false, source: msg.source }];
+        });
+        setBusy(false);
+      }
+    };
+
+    ws.onerror = () => failPending(UNREACHABLE);
+    ws.onclose = (evt) => {
+      if (!evt.wasClean) failPending(UNREACHABLE);
+    };
+
+    return () => {
+      // Drop the handlers first: closing fires onclose, and this teardown is
+      // by definition not a failure worth reporting to a turn that is about
+      // to be discarded anyway.
+      ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
+      ws.close();
+      wsRef.current = null;
+      queuedRef.current = null;
+    };
+  }, [detail.apn, disabled, failPending]);
 
   // Scroll the rail itself, never scrollIntoView - that walks every
   // scrollable ancestor including the window, so a tall answer dragged the
@@ -88,9 +174,25 @@ export function ChatRail({
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns]);
 
-  async function send(question: string) {
+  function send(question: string) {
     const q = question.trim();
     if (!q || busy || disabled) return;
+
+    const ws = wsRef.current;
+    const payload = contextPrefix(detail, archetype) + q;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ message: payload }));
+    } else if (ws?.readyState === WebSocket.CONNECTING) {
+      queuedRef.current = payload;
+    } else {
+      setDraft("");
+      setTurns((t) => [
+        ...t,
+        { role: "user", text: q },
+        { role: "assistant", text: UNREACHABLE, source: "error" },
+      ]);
+      return;
+    }
 
     setDraft("");
     setBusy(true);
@@ -99,28 +201,6 @@ export function ChatRail({
       { role: "user", text: q },
       { role: "assistant", text: "", pending: true },
     ]);
-
-    try {
-      const res = await askRag(contextPrefix(detail, archetype) + q);
-      setTurns((t) => [
-        ...t.slice(0, -1),
-        { role: "assistant", text: res.answer, source: res.source },
-      ]);
-    } catch (e) {
-      setTurns((t) => [
-        ...t.slice(0, -1),
-        {
-          role: "assistant",
-          text:
-            e instanceof ApiUnavailable
-              ? `Could not reach the assistant. ${e.message}`
-              : String(e),
-          source: "error",
-        },
-      ]);
-    } finally {
-      setBusy(false);
-    }
   }
 
   const notLive = turns.some((t) => t.role === "assistant" && t.source && t.source !== "live");
@@ -142,11 +222,13 @@ export function ChatRail({
             <p key={i} className="ml-6 rounded-lg bg-edge/50 px-3 py-2 text-sm">
               {turn.text}
             </p>
-          ) : turn.pending ? (
+          ) : turn.pending && !turn.text ? (
             <p key={i} className="text-sm text-dim">
               Thinking<span className="animate-pulse">…</span>
             </p>
           ) : (
+            // A streaming turn renders here too, from the first chunk on. Its
+            // source is unknown until "done", so no badge until then.
             <div key={i} className="space-y-1">
               {turn.source && turn.source !== "live" && (
                 <p className="rounded border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-sm leading-relaxed">
@@ -168,7 +250,7 @@ export function ChatRail({
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
-              onClick={() => void send(s)}
+              onClick={() => send(s)}
               className="rounded-full border border-edge px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-text"
             >
               {s}
@@ -181,7 +263,7 @@ export function ChatRail({
         className="flex gap-2 border-t border-edge p-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void send(draft);
+          send(draft);
         }}
       >
         <input

@@ -1,5 +1,6 @@
 import csv
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, Optional
 
@@ -156,6 +157,57 @@ async def answer_conversation(messages: list[dict[str, str]]) -> dict[str, Any]:
             "source": "mock",
             "error": f"{type(exc).__name__}: {exc}",
         }
+
+
+async def stream_conversation(messages: list[dict[str, str]]) -> AsyncIterator[dict[str, Any]]:
+    """
+    Streaming counterpart to answer_conversation, same inputs and same
+    grounding. Yields one or more {"type": "chunk", "text": ...} frames as
+    the model emits text, then exactly one terminating
+    {"type": "done", "source": ..., "error": ...} frame — callers can
+    forward each frame to a client verbatim.
+
+    Every path yields at least one chunk before "done", so a caller can
+    reassemble the answer by concatenating chunk text without special-casing
+    the mock or failure branches.
+
+    `source` is "live" or "mock" as in answer_conversation, plus a third
+    value this function alone can produce: "error", when the call failed
+    AFTER text was already streamed. A partial answer can't be retracted
+    once it's on the wire, so the turn is marked failed rather than being
+    silently replaced by the mock the non-streaming path would return.
+    """
+    if not ANTHROPIC_API_KEY:
+        yield {"type": "chunk", "text": _mock_answer(_last_user_message(messages))}
+        yield {"type": "done", "source": "mock", "error": None}
+        return
+
+    streamed_any = False
+    try:
+        rows = _load_rows()
+        chunks = _retrieve(_retrieval_query(messages), rows)
+        context = "\n\n".join(_row_to_text(r) for r in chunks)
+
+        client = _get_client()
+        async with client.messages.stream(
+            model=MODEL,
+            max_tokens=700,
+            system=SYSTEM + f"RETRIEVED PERMIT STATISTICS:\n{context}",
+            messages=messages,
+        ) as stream:
+            async for text in stream.text_stream:
+                streamed_any = True
+                yield {"type": "chunk", "text": text}
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        if streamed_any:
+            yield {"type": "done", "source": "error", "error": error}
+        else:
+            yield {"type": "chunk", "text": _mock_answer(_last_user_message(messages))}
+            yield {"type": "done", "source": "mock", "error": error}
+        return
+
+    yield {"type": "done", "source": "live", "error": None}
 
 
 async def answer_question(question: str) -> dict[str, Any]:
