@@ -1,12 +1,49 @@
-import { defineConfig } from "vite";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+const here = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * maplibre-gl loads its tile-decoding worker from a sibling URL
+ * (/assets/maplibre-gl-worker.mjs). The bundler rewrites that reference but
+ * never emits the file, so in production the worker 404s — and because the
+ * SPA rewrite turns any 404 into index.html, the browser reports it as a
+ * MIME-type refusal ("disallowed MIME type (text/html)") rather than a
+ * missing file.
+ *
+ * Without the worker MapLibre cannot decode vector tiles at all: the
+ * basemap renders and no parcels appear, with nothing logged by the map
+ * itself.
+ *
+ * Copied out of node_modules at build time rather than checked into
+ * public/, so it cannot drift from the installed version. Resolved by path
+ * because maplibre-gl's exports map blocks require.resolve on the root.
+ */
+function maplibreWorker(): Plugin {
+  return {
+    name: "copy-maplibre-worker",
+    apply: "build",
+    closeBundle() {
+      const src = resolve(here, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs");
+      if (!existsSync(src)) {
+        this.error(`maplibre worker not found at ${src} — the map will silently render no tiles`);
+      }
+      const dest = resolve(here, "dist/assets/maplibre-gl-worker.mjs");
+      mkdirSync(dirname(dest), { recursive: true });
+      copyFileSync(src, dest);
+      console.log("  copied maplibre-gl-worker.mjs -> dist/assets/");
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), maplibreWorker()],
   server: { port: 5173 },
-  // maplibre-gl's dedicated worker script doesn't survive esbuild's dep
-  // pre-bundling (the built worker chunk 404s), which silently stalls all
-  // vector-tile loading. Vite's own dev-server log names this as the fix.
+  // maplibre-gl's worker doesn't survive esbuild's dep pre-bundling in dev
+  // (the chunk 404s), which silently stalls vector-tile loading.
   optimizeDeps: { exclude: ["maplibre-gl"] },
 });
