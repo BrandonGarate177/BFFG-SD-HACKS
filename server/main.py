@@ -99,12 +99,18 @@ async def rag_chat_ws(websocket: WebSocket) -> None:
     forever, so the connection doesn't sit silent long enough for a proxy's
     idle timeout to kill it.
 
-    The answer itself is sent as a bare JSON string — just the answer, no
-    source/error wrapper. That means the client has no way to tell a mock
-    answer from a live one over this connection; if ANTHROPIC_API_KEY is
-    unset server-side, callers here get a mock answer with nothing marking
-    it as such (unlike POST /rag/chat and /parcel-detail, which still
-    report source/error).
+    Each answer is streamed as a sequence of tagged frames rather than one
+    blob, so the client can render text as it arrives:
+
+        {"type": "chunk", "text": "..."}   one or more, in order
+        {"type": "done", "source": "live" | "mock" | "error",
+         "error": str | None}              exactly one, terminating
+
+    Concatenating the chunk text of one turn reproduces the whole answer.
+    "done" carries the same source/error taxonomy as POST /rag/chat, so
+    unlike the earlier bare-string protocol a client here CAN tell a mock
+    answer from a live one — plus "error", which only the streaming path
+    can produce (see permit_rag.stream_conversation).
     """
     await websocket.accept()
     messages: list[dict[str, str]] = []
@@ -123,9 +129,20 @@ async def rag_chat_ws(websocket: WebSocket) -> None:
                 continue
 
             messages.append({"role": "user", "content": question})
-            result = await permit_rag.answer_conversation(messages)
-            messages.append({"role": "assistant", "content": result["answer"]})
-            await websocket.send_json(result["answer"])
+            parts: list[str] = []
+            async for frame in permit_rag.stream_conversation(messages):
+                if frame["type"] == "chunk":
+                    parts.append(frame["text"])
+                await websocket.send_json(frame)
+
+            answer = "".join(parts)
+            if answer:
+                messages.append({"role": "assistant", "content": answer})
+            else:
+                # Nothing came back. Drop the user turn too rather than leave
+                # history ending on it — the next question would then send two
+                # consecutive user messages, which the Messages API rejects.
+                messages.pop()
     except WebSocketDisconnect:
         pass
 
