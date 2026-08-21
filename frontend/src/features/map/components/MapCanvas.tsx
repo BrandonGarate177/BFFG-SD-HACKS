@@ -8,7 +8,8 @@ import { ParcelPopup } from "./ParcelPopup";
 type Props = {
   filters: Filters;
   selectedApn: string | null;
-  onSelect: (apn: string) => void;
+  /** The whole parcel, not just the apn - the caller prices it by archetype. */
+  onSelect: (parcel: TileParcel) => void;
 };
 
 type HoverState = { parcel: TileParcel; x: number; y: number } | null;
@@ -58,7 +59,7 @@ export function MapCanvas({ filters, selectedApn, onSelect }: Props) {
 
         map.on("click", layer, (e) => {
           const f = e.features?.[0];
-          if (f) onSelect((f.properties as unknown as TileParcel).apn);
+          if (f) onSelect(f.properties as unknown as TileParcel);
         });
       }
     });

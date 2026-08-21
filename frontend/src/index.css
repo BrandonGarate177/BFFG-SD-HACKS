@@ -16,6 +16,10 @@
   --color-dim: #a8bedb;
 }
 
+/* Native controls (select popups, range tracks, scrollbars) render dark
+   instead of light-on-navy. */
+html { color-scheme: dark; }
+
 html, body, #root { height: 100%; }
 body {
   margin: 0;

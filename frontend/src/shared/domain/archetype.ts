@@ -37,6 +37,15 @@ export const ARCHETYPE_UNITS: Record<Archetype, number> = {
   "5plus": 5,
 };
 
+/** Top of each band, so a per-archetype figure can be tested against the
+ *  largest project that still falls inside it. 5plus is open-ended. */
+export const ARCHETYPE_MAX_UNITS: Record<Archetype, number> = {
+  adu: 1,
+  duplex: 2,
+  "3_4_unit": 4,
+  "5plus": Infinity,
+};
+
 /**
  * The archetype a parcel falls into when built to full by-right capacity.
  * Mirrors the training pipeline's assignment rule, which keyed on

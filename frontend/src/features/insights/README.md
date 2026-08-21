@@ -71,10 +71,12 @@ sitting beside a figure; `WatchOut` collects all of them so they can't.
 
 ## The map's cost assumption arrives by URL
 
-`/parcel/:apn?hardCost=350000`. The map's slider is an assumption, not a
-model output, and this page shows the resulting construction estimate
-labelled as the user's own input. The query param is the interface — the two
-features still never import each other.
+`/parcel/:apn?hardCost=400000`. The map holds four rates, one per archetype,
+and sends the single one that applies to the clicked parcel — this page needs
+a number, not the table. It is an assumption, not a model output, and the page
+shows the resulting construction estimate labelled as the user's own input.
+The query param is the interface — the two features still never import each
+other. Absent when the parcel has no by-right capacity to price.
 
 ## The assistant
 

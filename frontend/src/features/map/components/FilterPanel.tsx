@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { BUDGET, COST_ASSUMPTIONS, TIMEFRAME } from "../config";
+import {
+  ARCHETYPES,
+  ARCHETYPE_LABEL,
+  ARCHETYPE_MAX_UNITS,
+  ARCHETYPE_UNITS,
+  type Archetype,
+} from "../../../shared/domain/archetype";
 import { MODEL } from "../../../shared/config";
 import { fmtUSDExact, parseMonths, parseUSD } from "../../../shared/format";
 import type { Filters } from "../lib/filters";
-import { unitsAffordable } from "../lib/filters";
+import { rateInertness, unitsAffordable } from "../lib/filters";
 
 type Props = {
   filters: Filters;
@@ -23,6 +30,15 @@ function Row({ label, value, children }: { label: string; value: React.ReactNode
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
+/** "3-4 units", "5+ units" - the capacity range a project size covers. */
+function bandLabel(a: Archetype): string {
+  const lo = ARCHETYPE_UNITS[a];
+  const hi = ARCHETYPE_MAX_UNITS[a];
+  if (!Number.isFinite(hi)) return `${lo}+ units`;
+  if (lo === hi) return lo === 1 ? "1 unit" : `${lo} units`;
+  return `${lo}-${hi} units`;
+}
 
 /**
  * The readout doubles as an input. Typing commits on Enter or blur and the
@@ -88,8 +104,74 @@ function NumberField({
 
 const slider = "range-accent";
 
+/** One archetype's rate: typed field plus slider, sharing filter state. */
+function CostRow({
+  archetype,
+  filters,
+  onChange,
+}: {
+  archetype: Archetype;
+  filters: Filters;
+  onChange: (next: Filters) => void;
+}) {
+  const set = (n: number) =>
+    onChange({ ...filters, hardCostPerUnit: { ...filters.hardCostPerUnit, [archetype]: n } });
+  const inert = rateInertness(
+    filters,
+    archetype,
+    COST_ASSUMPTIONS.hardCostMin,
+    COST_ASSUMPTIONS.hardCostMax,
+  );
+
+  return (
+    <Row
+      label={ARCHETYPE_LABEL[archetype]}
+      value={
+        <NumberField
+          label={`Assumed cost per unit for ${ARCHETYPE_LABEL[archetype]}, in US dollars`}
+          value={filters.hardCostPerUnit[archetype]}
+          min={COST_ASSUMPTIONS.hardCostMin}
+          max={COST_ASSUMPTIONS.hardCostMax}
+          format={fmtUSDExact}
+          parse={parseUSD}
+          onCommit={set}
+          width="w-32"
+        />
+      }
+    >
+      <input
+        type="range"
+        className={slider}
+        aria-label={`${ARCHETYPE_LABEL[archetype]} cost per unit`}
+        min={COST_ASSUMPTIONS.hardCostMin}
+        max={COST_ASSUMPTIONS.hardCostMax}
+        step={COST_ASSUMPTIONS.hardCostStep}
+        value={filters.hardCostPerUnit[archetype]}
+        onChange={(e) => set(Number(e.target.value))}
+      />
+      {inert && (
+        <p className="text-[11px] text-dim leading-relaxed">
+          No effect at this budget —{" "}
+          {inert === "all-affordable" ? (
+            <>
+              every {ARCHETYPE_LABEL[archetype]} parcel is affordable at any rate on this
+              scale. Lower the budget to make it bite.
+            </>
+          ) : (
+            <>
+              no {ARCHETYPE_LABEL[archetype]} parcel is affordable at any rate on this
+              scale. Raise the budget to make it bite.
+            </>
+          )}
+        </p>
+      )}
+    </Row>
+  );
+}
+
 export function FilterPanel({ filters, onChange }: Props) {
   const units = unitsAffordable(filters);
+  const selected = filters.archetype;
 
   return (
     <aside className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-edge bg-panel p-5 space-y-7 overflow-y-auto">
@@ -99,6 +181,38 @@ export function FilterPanel({ filters, onChange }: Props) {
           City of San Diego parcels where zoning already permits homes that have not been built.
         </p>
       </header>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="project-type"
+          className="block text-xs uppercase tracking-wider text-muted"
+        >
+          Project type
+        </label>
+        <select
+          id="project-type"
+          className="mono w-full rounded border border-edge/70 bg-ink/40 px-2 py-1.5 text-sm text-accent outline-none focus:border-accent"
+          value={filters.archetype ?? "all"}
+          onChange={(e) =>
+            onChange({
+              ...filters,
+              archetype: e.target.value === "all" ? null : (e.target.value as Archetype),
+            })
+          }
+        >
+          <option value="all">All types</option>
+          {ARCHETYPES.map((a) => (
+            <option key={a} value={a}>
+              {ARCHETYPE_LABEL[a]} · {bandLabel(a)}
+            </option>
+          ))}
+        </select>
+        <p className="text-[11px] text-dim leading-relaxed">
+          {selected
+            ? `Showing only parcels whose by-right capacity is ${bandLabel(selected)}.`
+            : "Showing every parcel with by-right capacity, priced at the rate for its own size."}
+        </p>
+      </div>
 
       <Row
         label="Budget"
@@ -125,8 +239,14 @@ export function FilterPanel({ filters, onChange }: Props) {
           onChange={(e) => onChange({ ...filters, budgetUsd: Number(e.target.value) })}
         />
         <p className="text-[11px] text-dim">
-          Buys about <span className="mono text-text">{units}</span>{" "}
-          {units === 1 ? "unit" : "units"} at the assumed cost below.
+          {units === 0 ? (
+            <>Buys nothing at the rates below, so no parcel can match.</>
+          ) : (
+            <>
+              Buys about <span className="mono text-text">{units}</span>{" "}
+              {units === 1 ? "unit" : "units"} at the rates below.
+            </>
+          )}
         </p>
       </Row>
 
@@ -160,36 +280,30 @@ export function FilterPanel({ filters, onChange }: Props) {
         </p>
       </Row>
 
-      <div className="border-t border-edge pt-5">
-        <Row
-          label="Assumption · cost per unit"
-          value={
-            <NumberField
-              label="Assumed cost per unit in US dollars"
-              value={filters.hardCostPerUnit}
-              min={COST_ASSUMPTIONS.hardCostMin}
-              max={COST_ASSUMPTIONS.hardCostMax}
-              format={fmtUSDExact}
-              parse={parseUSD}
-              onCommit={(hardCostPerUnit) => onChange({ ...filters, hardCostPerUnit })}
-              width="w-32"
-            />
-          }
-        >
-          <input
-            type="range"
-            className={slider}
-            min={COST_ASSUMPTIONS.hardCostMin}
-            max={COST_ASSUMPTIONS.hardCostMax}
-            step={COST_ASSUMPTIONS.hardCostStep}
-            value={filters.hardCostPerUnit}
-            onChange={(e) => onChange({ ...filters, hardCostPerUnit: Number(e.target.value) })}
-          />
-        </Row>
-        <p className="text-[11px] text-dim mt-2 leading-relaxed">
-          <span className="text-accent">Not a model output.</span> Construction cost is
-          not modelled by the permit data. Budget filtering is arithmetic over this figure —
-          move it to see how much the result depends on the assumption.
+      <div className="border-t border-edge pt-5 space-y-4">
+        <div className="space-y-2">
+          <span className="text-xs uppercase tracking-wider text-muted">
+            Assumption · cost per unit
+          </span>
+          <p className="text-[11px] text-dim leading-relaxed">
+            <span className="text-accent">Not a model output.</span> Construction cost is
+            not modelled by the permit data. Budget filtering is arithmetic over these
+            figures — move them to see how much the result depends on the assumption.
+          </p>
+        </div>
+
+        {(selected ? [selected] : ARCHETYPES).map((a) => (
+          <CostRow key={a} archetype={a} filters={filters} onChange={onChange} />
+        ))}
+
+        <p className="text-[11px] text-dim leading-relaxed">
+          {selected
+            ? "Showing the rate for the selected type. Switch to All types to edit the others."
+            : "Each parcel is priced at the rate for its own by-right capacity."}{" "}
+          ADU and 5+ are anchored to published San Diego figures; duplex and 3-4 unit are
+          interpolated between them and are the softest numbers here. All four exclude
+          land, permit fees and design, so they are a floor. Provenance is in{" "}
+          <span className="mono text-muted">config.ts</span>.
         </p>
       </div>
 

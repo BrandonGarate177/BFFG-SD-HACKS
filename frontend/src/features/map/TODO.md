@@ -30,17 +30,24 @@ As of 2026-08-21. `[!]` blocks other work.
 - **Community filter.** Server `/search` accepts `community`; there's no control.
 - **Coastal deferred-certification styling.** 2,367 parcels where the Coastal
   Commission permits, not the City. Noted in the popup, not styled on the map.
-- **Citywide match count.** Viewport-only today and labelled as such. A real
-  total needs precomputed counts from the server.
+- **Citywide match count.** Removed — the old readout counted whatever was
+  drawn, which tracked the viewport rather than the filters. A real total
+  needs precomputed counts from the server.
 - **Popup demographics.** Whiteboard calls for value / income / residents. No
   assessed value or ACS data exists in either parquet.
 - **Decide `/search`.** The map filters client-side on tile attributes and never
   calls it. Either it backs a list view or it goes.
 
 **Budget semantics (deliberate, not a bug).** This feature filters *estimated
-construction cost* — an adjustable assumption. Server `/search` filters
+construction cost* — an adjustable assumption, now four rates keyed by
+archetype rather than one blended figure. Server `/search` filters
 `permit_fee`, which is real and a floor. Two orders of magnitude apart. See
 `frontend/CONTRIBUTING.md`.
+
+**Duplex and 3-4 unit rates are interpolated**, not sourced — no public
+per-unit dataset covers small market-rate infill in San Diego. The ADU and
+5+ anchors have citations in `config.ts`; these two do not. Replace them if
+a real figure turns up.
 
 **Dev parcels carry synthetic APNs**, so clicking through 404s against
 `/parcel-detail` when running without `VITE_TILES_URL` set (the geojson
