@@ -4,9 +4,7 @@ Backend for the building-permits hackathon project: a fast in-memory search and
 detail lookup over **real precomputed ML predictions** (`../data/predictions.parquet`
 — 393,755 San Diego parcels, 1,575,020 predictions from a trained
 `RandomSurvivalForest`, C-index 0.612 — see `../data/README.md` for the full
-pipeline writeup), plus a live call to the teammates' RAG bot for per-parcel
-context, and a bulk-export path that hands parcel data to the ML model's
-bulk-ingest endpoint.
+pipeline writeup), plus a self-hosted Claude-powered permit Q&A.
 
 No authentication, no cookies — public unauthenticated demo server. `data/` is
 read-only from this server's point of view: it's loaded into memory at startup,
@@ -34,14 +32,13 @@ server is ready.
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and fill in real URLs if you have them. Both are
-optional — if unset (or if the call fails for any reason), the server falls
+Copy `.env.example` to `.env` and fill in a real key if you have one —
+optional; if unset (or if the call fails for any reason), the server falls
 back to a realistic mock response with the same shape, so nothing crashes.
 
 | Variable | Purpose |
 |---|---|
-| `RAG_API_URL` | Endpoint for the teammates' RAG bot (built on Snowflake). Receives the merged parcel record via POST, returns `{"reasons": [string, ...], "sentiment_summary": string}`. |
-| `ML_MODEL_BULK_URL` | Endpoint for the ML model's bulk-ingest. Receives a JSON body `{"records": [...]}`, one object per row, keyed by the DSD projects/approvals column names. No file upload. Returns `{"status": string, "rows_received": number}`. |
+| `ANTHROPIC_API_KEY` | Claude API key. Powers both `POST /rag/chat` and `/parcel-detail`'s `rag_result` (see `permit_rag.py`). |
 
 ```bash
 copy .env.example .env
@@ -50,7 +47,11 @@ copy .env.example .env
 There is no `ML_MODEL_URL` — `../data/predictions.parquet` **is** that model's
 own precomputed output, so `/parcel-detail` reads it directly instead of making
 a live call that would just re-ask the same model for a number it already
-computed.
+computed. The ML bulk-export path (sending parcel data out to an ML team
+ingest endpoint) and the separate teammate-hosted RAG bot (Gradio, over
+ngrok) have both been retired too — the ngrok tunnel wasn't reliable, and
+`permit_rag.py` (Claude + `permit_type_stats.csv`) covers the same ground
+self-hosted.
 
 ## How it works
 
@@ -77,7 +78,8 @@ returning:
 - `model_info` — the model's C-index and the predictions' as-of date, so the
   frontend can (and per `../data/README.md` must) show the model's real
   accuracy alongside any prediction
-- `rag_result` — live if `RAG_API_URL` is set, otherwise a deterministic mock
+- `rag_result` — Claude-generated context on the parcel (via `permit_rag.py`),
+  or a deterministic mock if `ANTHROPIC_API_KEY` is unset / the call fails
 
 404s on an unknown apn.
 
@@ -85,34 +87,32 @@ returning:
 
 Returns `../data/predictions_meta.json` as-is (C-index, as-of date, row counts).
 
-### Bulk export to the ML model
+### `POST /rag/chat` — general permit Q&A
 
-- `GET /ml/bulk-export/csv?limit=500` — builds a CSV from up to `limit` parcels
-  (default/cap keep this well under the full 393,755-parcel dataset) and
-  returns it as a file download, purely for local inspection.
-- `POST /ml/bulk-export?limit=500` — builds the same rows and sends them to
-  `ML_MODEL_BULK_URL` as a plain JSON POST, `{"records": [...]}` — no file
-  upload. Falls back to a mock acknowledgement if the URL is unset or fails.
-
-The row columns follow the DSD projects/approvals schema (`csv_export.py`,
-`CSV_HEADERS`) — the exact header list the ML model team specified. The real
-parcel data only overlaps a few of those columns (APN as `PROJECT_ID`/`JOB_ID`/
-`GIS_APN`, and `delta_units` as `APPROVAL_DU_NET_CHANGE`); the rest are blank —
-there's no address, geometry, or project/approval record in this dataset.
+`{"message": "..."}` → `{"answer", "source", "error"}`. Keyword-retrieves the
+most relevant rows from `permit_type_stats.csv` (permit type × processing
+track → median/avg/p90 days and valuation, from the City's *closed*
+approvals), hands them to Claude as grounding context, returns the answer.
+Same underlying call `/parcel-detail`'s `rag_result` uses, just answering a
+free-form question instead of one built from a specific parcel.
 
 ## Files
 
 - `main.py` — FastAPI app: `/search`, `/parcel-detail`, `/model-info`,
-  `/ml/bulk-export*`, CORS.
+  `/rag/chat`, CORS.
 - `parcel_lookup.py` — loads `../data/predictions.parquet` +
   `../data/predictions_meta.json` at import time; exposes `get_dataframe()`
   (for `/search`), `get_parcel(apn)`, `get_all_apns()`, `iter_all_parcels()`,
   and `MODEL_INFO`.
 - `precomputed_predictions.py` — `filter_parcels(archetype, budget_usd,
   timeframe_months, community=None, limit=200)` over `parcel_lookup`'s frame.
-- `rag_client.py` — async `httpx` POST to `RAG_API_URL`, mock fallback.
-- `csv_export.py` — DSD-schema CSV/record builder for bulk export.
-- `ml_bulk_client.py` — async `httpx` POST to `ML_MODEL_BULK_URL`, mock fallback.
+- `rag_client.py` — builds a parcel-specific question, delegates to
+  `permit_rag.answer_question`, reshapes the answer into `reasons` /
+  `sentiment_summary` for `/parcel-detail`.
+- `permit_rag.py` — the actual Claude call + `permit_type_stats.csv`
+  retrieval, shared by both RAG-ish endpoints. Mock fallback if
+  `ANTHROPIC_API_KEY` is unset or the call fails.
+- `permit_type_stats.csv` — the data `permit_rag.py` retrieves from.
 - `models.py` — Pydantic request/response models.
 
 ## Sample curl commands
@@ -152,6 +152,14 @@ curl -X POST http://localhost:8000/parcel-detail \
 ```
 
 Returns `404`.
+
+### `/rag/chat`
+
+```bash
+curl -X POST http://localhost:8000/rag/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"How long does an electrical permit usually take?\"}"
+```
 
 ### `/model-info`
 

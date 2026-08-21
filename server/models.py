@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 Archetype = Literal["adu", "duplex", "3_4_unit", "5plus"]
 
@@ -49,6 +49,8 @@ class ParcelCapacity(BaseModel):
 
 
 class ModelInfo(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())  # "model_c_index" isn't a Pydantic internal
+
     source: str = "precomputed"
     model_c_index: float
     predictions_as_of: str
@@ -66,6 +68,8 @@ class RagResult(BaseModel):
 
 
 class ParcelDetailResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())  # "model_info" isn't a Pydantic internal
+
     apn: str
     parcel: dict[str, Any]
     capacity: ParcelCapacity
@@ -74,8 +78,11 @@ class ParcelDetailResponse(BaseModel):
     rag_result: RagResult
 
 
-class MlBulkUploadResponse(BaseModel):
-    status: str
-    rows_received: int
+class RagChatRequest(BaseModel):
+    message: str
+
+
+class RagChatResponse(BaseModel):
+    answer: str
     source: str
     error: Optional[str] = None

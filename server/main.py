@@ -1,25 +1,22 @@
-import itertools
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
 
-import csv_export
-import ml_bulk_client
 import parcel_lookup
+import permit_rag
 import precomputed_predictions
 import rag_client
 from models import (
     ArchetypePrediction,
-    MlBulkUploadResponse,
     ModelInfo,
     ParcelCapacity,
     ParcelDetailRequest,
     ParcelDetailResponse,
+    RagChatRequest,
+    RagChatResponse,
     RagResult,
     SearchRequest,
     SearchResponse,
@@ -77,31 +74,13 @@ async def model_info() -> dict:
     return parcel_lookup.MODEL_INFO
 
 
-@app.get("/ml/bulk-export/csv")
-async def bulk_export_csv(limit: int = Query(500, le=5000)) -> Response:
-    """Downloads the DSD-schema CSV built from up to `limit` parcels, without
-    sending it anywhere. Useful for inspecting exactly what /ml/bulk-export would
-    upload. Defaults and caps at a small limit — the real dataset has 393,755
-    parcels, far more than makes sense as a default download."""
-    parcels = itertools.islice(parcel_lookup.iter_all_parcels(), limit)
-    csv_bytes = csv_export.build_csv_bytes(list(parcels))
-    return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=development_projects.csv"},
-    )
-
-
-@app.post("/ml/bulk-export", response_model=MlBulkUploadResponse)
-async def bulk_export(limit: int = Query(500, le=5000)) -> MlBulkUploadResponse:
-    """Builds the DSD-schema rows from up to `limit` parcels and sends them as JSON
-    to the ML model's bulk-ingest endpoint (ML_MODEL_BULK_URL) — no file upload
-    involved. Falls back to a mock acknowledgement if the URL is unset or the call
-    fails, same pattern as /parcel-detail's RAG call."""
-    parcels = itertools.islice(parcel_lookup.iter_all_parcels(), limit)
-    records = csv_export.build_records(list(parcels))
-    result = await ml_bulk_client.send_bulk_records(records)
-    return MlBulkUploadResponse(**result)
+@app.post("/rag/chat", response_model=RagChatResponse)
+async def rag_chat(request: RagChatRequest) -> RagChatResponse:
+    """General-purpose permit Q&A, grounded in permit_type_stats.csv. Same
+    underlying Claude call as /parcel-detail's rag_result, just asked a
+    free-form question instead of one built from a specific parcel."""
+    result = await permit_rag.answer_question(request.message)
+    return RagChatResponse(**result)
 
 
 @app.get("/health")
