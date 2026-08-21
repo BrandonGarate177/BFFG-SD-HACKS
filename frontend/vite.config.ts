@@ -47,7 +47,8 @@ function maplibreWorker(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), maplibreWorker()],
   server: { port: 5173 },
-  // maplibre-gl's worker doesn't survive esbuild's dep pre-bundling in dev
-  // (the chunk 404s), which silently stalls vector-tile loading.
-  optimizeDeps: { exclude: ["maplibre-gl"] },
+  // No optimizeDeps.exclude for maplibre-gl. That was a v6 workaround for its
+  // separate worker chunk; v5 inlines the worker, and excluding it makes Vite
+  // serve the raw ESM entry — which exports only `default` — so the dev server
+  // and the production bundle disagree about the module's shape.
 });
