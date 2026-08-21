@@ -8,9 +8,9 @@ import {
   type Archetype,
 } from "../../../shared/domain/archetype";
 import { MODEL } from "../../../shared/config";
-import { fmtUSDExact, parseMonths, parseUSD } from "../../../shared/format";
+import { fmtUSD, fmtUSDExact, parseMonths, parseUSD } from "../../../shared/format";
 import type { Filters } from "../lib/filters";
-import { rateInertness, unitsAffordable } from "../lib/filters";
+import { budgetReach, rateInertness } from "../lib/filters";
 
 type Props = {
   filters: Filters;
@@ -30,6 +30,14 @@ function Row({ label, value, children }: { label: string; value: React.ReactNode
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
+/** Fixed set, so spell the article out rather than guess from the spelling. */
+const ARTICLE: Record<Archetype, string> = {
+  adu: "An",
+  duplex: "A",
+  "3_4_unit": "A",
+  "5plus": "A",
+};
 
 /** "3-4 units", "5+ units" - the capacity range a project size covers. */
 function bandLabel(a: Archetype): string {
@@ -170,8 +178,14 @@ function CostRow({
 }
 
 export function FilterPanel({ filters, onChange }: Props) {
-  const units = unitsAffordable(filters);
+  const reach = budgetReach(filters);
   const selected = filters.archetype;
+
+  /** Enough of the rates to read at a glance while collapsed. */
+  const rates = (selected ? [selected] : ARCHETYPES).map((a) => filters.hardCostPerUnit[a]);
+  const lo = Math.min(...rates);
+  const hi = Math.max(...rates);
+  const rateSummary = lo === hi ? fmtUSDExact(lo) : `${fmtUSD(lo)}–${fmtUSD(hi)}`;
 
   return (
     <aside className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-edge bg-panel p-5 space-y-7 overflow-y-auto">
@@ -238,13 +252,24 @@ export function FilterPanel({ filters, onChange }: Props) {
           value={filters.budgetUsd}
           onChange={(e) => onChange({ ...filters, budgetUsd: Number(e.target.value) })}
         />
-        <p className="text-[11px] text-dim">
-          {units === 0 ? (
+        <p className="text-[11px] text-dim leading-relaxed">
+          {reach.kind === "none" ? (
             <>Buys nothing at the rates below, so no parcel can match.</>
+          ) : reach.kind === "money-bound" ? (
+            <>
+              Buys about <span className="mono text-text">{reach.units}</span>{" "}
+              {reach.units === 1 ? "unit" : "units"} at the rates below.
+            </>
           ) : (
             <>
-              Buys about <span className="mono text-text">{units}</span>{" "}
-              {units === 1 ? "unit" : "units"} at the rates below.
+              {ARTICLE[reach.archetype]} {ARCHETYPE_LABEL[reach.archetype]} project is{" "}
+              <span className="mono text-text">{reach.units}</span>{" "}
+              {reach.units === 1 ? "unit" : "units"} at about{" "}
+              <span className="mono text-text">{fmtUSD(reach.cost)}</span> — the project
+              size caps it, not your money. <span className="mono text-text">
+                {fmtUSD(reach.spare)}
+              </span>{" "}
+              of the budget is spare.
             </>
           )}
         </p>
@@ -280,32 +305,46 @@ export function FilterPanel({ filters, onChange }: Props) {
         </p>
       </Row>
 
-      <div className="border-t border-edge pt-5 space-y-4">
-        <div className="space-y-2">
-          <span className="text-xs uppercase tracking-wider text-muted">
-            Assumption · cost per unit
-          </span>
+      {/*
+        Secondary by rank, not by importance: budget, time frame and project
+        type are the question being asked, these are how the answer is
+        computed. Native <details> so it is keyboard-operable for free.
+        The "not a model output" label stays visible when collapsed - the
+        caveat is the one part that must not be behind a click.
+      */}
+      <details className="group border-t border-edge pt-5">
+        <summary className="cursor-pointer list-none space-y-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs uppercase tracking-wider text-muted">
+              <span className="mr-1 inline-block transition-transform group-open:rotate-90">
+                ▸
+              </span>
+              Assumptions · cost per unit
+            </span>
+            <span className="mono text-sm text-accent">{rateSummary}</span>
+          </div>
           <p className="text-[11px] text-dim leading-relaxed">
             <span className="text-accent">Not a model output.</span> Construction cost is
-            not modelled by the permit data. Budget filtering is arithmetic over these
-            figures — move them to see how much the result depends on the assumption.
+            not modelled by the permit data — open to adjust it.
+          </p>
+        </summary>
+
+        <div className="mt-4 space-y-4">
+          {(selected ? [selected] : ARCHETYPES).map((a) => (
+            <CostRow key={a} archetype={a} filters={filters} onChange={onChange} />
+          ))}
+
+          <p className="text-[11px] text-dim leading-relaxed">
+            {selected
+              ? "Showing the rate for the selected type. Switch to All types to edit the others."
+              : "Each parcel is priced at the rate for its own by-right capacity."}{" "}
+            ADU and 5+ are anchored to published San Diego figures; duplex and 3-4 unit are
+            interpolated between them and are the softest numbers here. All four exclude
+            land, permit fees and design, so they are a floor. Provenance is in{" "}
+            <span className="mono text-muted">config.ts</span>.
           </p>
         </div>
-
-        {(selected ? [selected] : ARCHETYPES).map((a) => (
-          <CostRow key={a} archetype={a} filters={filters} onChange={onChange} />
-        ))}
-
-        <p className="text-[11px] text-dim leading-relaxed">
-          {selected
-            ? "Showing the rate for the selected type. Switch to All types to edit the others."
-            : "Each parcel is priced at the rate for its own by-right capacity."}{" "}
-          ADU and 5+ are anchored to published San Diego figures; duplex and 3-4 unit are
-          interpolated between them and are the softest numbers here. All four exclude
-          land, permit fees and design, so they are a floor. Provenance is in{" "}
-          <span className="mono text-muted">config.ts</span>.
-        </p>
-      </div>
+      </details>
 
       <footer className="border-t border-edge pt-4 text-[11px] text-dim leading-relaxed space-y-2">
         <p>

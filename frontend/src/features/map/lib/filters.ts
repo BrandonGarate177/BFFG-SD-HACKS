@@ -88,23 +88,45 @@ export function toFilter(f: Filters): FilterSpecification {
 }
 
 /**
- * Largest capacity the current budget admits anywhere on the ladder. Used for
- * the readout, so the user can see what the money buys before reading the map.
+ * What the budget reaches, and WHICH constraint stops it there.
  *
- * Cost per unit is a step function of unit count, so this is not one division:
- * a budget can afford 4 units at the 3-4 rate and still not reach 5 at the
- * 5plus rate. Each band is tested at its own price and only counts if the
- * resulting count actually lands inside that band. Scoped to the selected
- * project size when there is one, so the readout matches what the map shows.
+ * Cost per unit is a step function of unit count, so the largest affordable
+ * capacity is not one division: a budget can afford 4 units at the 3-4 rate
+ * and still not reach 5 at the 5plus rate. Each band is tested at its own
+ * price and only counts if the resulting count lands inside that band.
+ *
+ * The kind matters as much as the number. Scoped to a closed band, capacity
+ * is capped by the band itself rather than by money - an ADU project is one
+ * unit however rich you are - so a plain "buys N units" readout freezes and
+ * looks broken. Callers report the binding constraint instead.
  */
-export function unitsAffordable(f: Filters): number {
+export type BudgetReach =
+  | { kind: "none" }
+  | { kind: "money-bound"; units: number }
+  | { kind: "band-bound"; archetype: Archetype; units: number; cost: number; spare: number };
+
+export function budgetReach(f: Filters): BudgetReach {
   let best = 0;
+  let winner: Archetype | null = null;
+
   for (const a of ARCHETYPES) {
     if (f.archetype != null && a !== f.archetype) continue;
     const n = Math.min(Math.floor(f.budgetUsd / f.hardCostPerUnit[a]), ARCHETYPE_MAX_UNITS[a]);
-    if (n > 0 && archetypeForUnits(n) === a) best = Math.max(best, n);
+    if (n > 0 && archetypeForUnits(n) === a && n > best) {
+      best = n;
+      winner = a;
+    }
   }
-  return best;
+  if (winner == null) return { kind: "none" };
+
+  const rate = f.hardCostPerUnit[winner];
+  // Only meaningful when scoped: with every band showing, a budget that
+  // cannot reach the next band up is still money-bound, not band-bound.
+  if (f.archetype == null || Math.floor(f.budgetUsd / rate) <= best) {
+    return { kind: "money-bound", units: best };
+  }
+  const cost = best * rate;
+  return { kind: "band-bound", archetype: winner, units: best, cost, spare: f.budgetUsd - cost };
 }
 
 /**
