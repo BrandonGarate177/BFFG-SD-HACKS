@@ -123,9 +123,12 @@ async def rag_chat_ws(websocket: WebSocket) -> None:
                 continue
 
             messages.append({"role": "user", "content": question})
-            result = await permit_rag.answer_conversation(messages)
-            messages.append({"role": "assistant", "content": result["answer"]})
-            await websocket.send_json(result["answer"])
+            full_text = ""
+            async for event in permit_rag.stream_conversation(messages):
+                if event["type"] == "chunk":
+                    full_text += event["text"]
+                await websocket.send_json(event)
+            messages.append({"role": "assistant", "content": full_text})
     except WebSocketDisconnect:
         pass
 
