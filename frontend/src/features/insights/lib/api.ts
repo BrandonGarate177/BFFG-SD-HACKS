@@ -1,5 +1,11 @@
 import { get, post } from "../../../shared/api/client";
-import type { ModelMeta, ParcelDetail, SearchRequest, SearchResponse } from "../types";
+import type {
+  ModelMeta,
+  ParcelDetail,
+  RagChatResponse,
+  SearchRequest,
+  SearchResponse,
+} from "../types";
 
 /** POST /parcel-detail — 404s outside the 393,755-parcel City dataset. */
 export function fetchParcelDetail(apn: string): Promise<ParcelDetail> {
@@ -20,4 +26,14 @@ export function searchParcels(req: SearchRequest): Promise<SearchResponse> {
 /** GET /model-info — predictions_meta.json verbatim. */
 export function fetchModelMeta(): Promise<ModelMeta> {
   return get<ModelMeta>("/model-info");
+}
+
+/**
+ * POST /rag/chat — one free-text question, one grounded answer.
+ *
+ * The server composes /parcel-detail's rag_result from this same path, so
+ * follow-ups here are continuous with the opening answer.
+ */
+export function askRag(message: string): Promise<RagChatResponse> {
+  return post<RagChatResponse>("/rag/chat", { message });
 }

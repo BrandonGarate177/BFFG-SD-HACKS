@@ -4,11 +4,13 @@ import { ApiUnavailable } from "../../shared/api/client";
 import { API_BASE } from "../../shared/config";
 import { archetypeForUnits, type Archetype } from "../../shared/domain/archetype";
 import { fetchParcelDetail } from "./lib/api";
+import { SAMPLE_PARCEL_DETAIL } from "./lib/fixture";
 import { CapacityPanel } from "./components/CapacityPanel";
 import { HeroAnswer } from "./components/HeroAnswer";
 import { ParcelFacts } from "./components/ParcelFacts";
 import { ParcelFinder } from "./components/ParcelFinder";
-import { RagPanel } from "./components/RagPanel";
+import { ChatRail } from "./components/ChatRail";
+import { SampleDataBanner } from "./components/SampleDataBanner";
 import { WatchOut } from "./components/WatchOut";
 import type { ParcelDetail } from "./types";
 
@@ -17,6 +19,8 @@ export function InsightsPage() {
   const [params] = useSearchParams();
   const [detail, setDetail] = useState<ParcelDetail | null>(null);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  /** Non-null when `detail` is the fixture rather than a real response. */
+  const [sampleReason, setSampleReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [archetype, setArchetype] = useState<Archetype | null>(null);
 
@@ -36,13 +40,25 @@ export function InsightsPage() {
     let cancelled = false;
     setDetail(null);
     setUnavailable(null);
+    setSampleReason(null);
     setArchetype(null);
     setLoading(true);
 
     fetchParcelDetail(apn)
-      .then((d) => !cancelled && setDetail(d))
+      .then((d) => {
+        if (!cancelled) setDetail(d);
+      })
       .catch((e: unknown) => {
-        if (!cancelled) setUnavailable(e instanceof ApiUnavailable ? e.message : String(e));
+        if (cancelled) return;
+        const msg = e instanceof ApiUnavailable ? e.message : String(e);
+        setUnavailable(msg);
+        // A 404 means the apn genuinely is not in the dataset - showing
+        // sample numbers under it would imply the parcel exists. Only fall
+        // back when the server itself is unreachable.
+        if (!msg.startsWith("Not found")) {
+          setDetail({ ...SAMPLE_PARCEL_DETAIL, apn });
+          setSampleReason(msg);
+        }
       })
       .finally(() => !cancelled && setLoading(false));
 
@@ -78,11 +94,13 @@ export function InsightsPage() {
         )}
       </div>
 
+      {sampleReason && <SampleDataBanner reason={sampleReason} />}
+
       {!detail && <ParcelFinder />}
 
       {loading && <p className="text-sm text-dim">Loading…</p>}
 
-      {unavailable && (
+      {unavailable && !sampleReason && (
         <div className="rounded-lg border border-accent/50 bg-accent/5 p-4 space-y-2">
           <div className="text-sm font-medium text-accent">No detail for this APN</div>
           <p className="text-xs leading-relaxed text-muted">{unavailable}</p>
@@ -118,7 +136,11 @@ export function InsightsPage() {
 
             <div className="lg:col-span-2">
               <div className="lg:sticky lg:top-6">
-                <RagPanel rag={detail.rag_result} />
+                <ChatRail
+                  detail={detail}
+                  archetype={selected}
+                  disabled={Boolean(sampleReason)}
+                />
               </div>
             </div>
           </div>

@@ -19,7 +19,9 @@ the route and fetches everything else itself.
 | `components/WatchOut.tsx` | every caveat, collected in one place |
 | `components/ParcelFacts.tsx` | zone, lot, ZIP, coastal jurisdiction |
 | `components/ParcelFinder.tsx` | apn lookup + `/search`, so this feature demos alone |
-| `components/RagPanel.tsx` | markdown answer, provenance, de-duplication |
+| `components/ChatRail.tsx` | conversation over `/rag/chat`, context injection |
+| `components/SampleDataBanner.tsx` | sticky label for fixture mode |
+| `lib/fixture.ts` | sample response, server-unreachable only |
 
 ## Four invariants
 
@@ -74,13 +76,30 @@ model output, and this page shows the resulting construction estimate
 labelled as the user's own input. The query param is the interface — the two
 features still never import each other.
 
-## The RAG response has two shapes
+## The assistant
 
-The Gradio client regexes bullet lines OUT of the markdown answer, so
-`reasons` is a *subset* of `sentiment_summary` and rendering both prints the
-same content twice. The older httpx client returned them as genuinely
-separate values. `RagPanel` detects containment rather than assuming either,
-because only one of the two is currently pushed.
+`/parcel-detail` already carries one server-composed answer, so the rail
+opens with it rather than an empty box. Follow-ups go to `POST /rag/chat`,
+which is the same self-hosted Claude + `permit_type_stats.csv` retrieval the
+server used to build that opening answer — the conversation is continuous.
+
+**Parcel facts and model numbers are injected into every message**, never
+left for the model to recall. It has no access to this parcel otherwise, and
+an inferred permit duration is exactly how a wrong number gets spoken aloud.
+
+`reasons` is regexed out of `sentiment_summary` server-side
+(`rag_client._parse_chat_response`), so it is a subset — only the full answer
+is rendered. Printing both would duplicate every bullet.
+
+## Sample-data fallback
+
+Every panel is gated behind one `/parcel-detail` fetch, so an unreachable
+server leaves a blank page. `lib/fixture.ts` fills it, with a sticky
+non-dismissible banner and the chat input disabled.
+
+**A 404 does not trigger it.** That means the apn genuinely is not in the
+393,755-parcel dataset, and rendering invented numbers under it would imply
+the parcel exists. Only an unreachable or erroring server falls back.
 
 ## Contract drift
 

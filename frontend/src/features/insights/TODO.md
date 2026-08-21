@@ -2,23 +2,20 @@
 
 As of 2026-08-21. `[!]` blocks other work.
 
-- `[!]` **RAG endpoint is down.** `https://recovery-proclaim-earwig.ngrok-free.dev/`
-  returns 502 — their local server, not the tunnel. Every answer is a mock and
-  labelled as one. Check `rag_result.source` before trusting anything in a demo.
 - `[!]` **Server can't read its own data.** `requirements.txt` pins
   `pyarrow==17.0.0`, which has no Python 3.13 wheel and cannot read these
   parquets anyway — they were written by 25.0.1, and older readers fail with
   `Repetition level histogram size mismatch`. Verified 25.0.1 reads all
   1,575,020 rows. Pin `pyarrow>=25`.
-- **Gradio `rag_client.py` isn't pushed.** No branch contains it; `origin/main`
-  still has the httpx version. The UI handles both response shapes.
-- **Chat.** The assistant answers one server-composed question per parcel. No
-  conversation, no user-typed follow-up.
-- **Citations.** Gradio returns prose with no source references, so answers
-  can't be checked. Highest-value addition once the endpoint is live.
-- **Prediction context injection.** Confirm the question the server composes
-  actually carries `predictions` and `capacity`, so the bot never infers a
-  duration it could get wrong.
+- **`ANTHROPIC_API_KEY` must be set** or every answer is a labelled mock.
+- **Citations.** The assistant answers in prose with no source references, so
+  claims can't be checked against `permit_type_stats.csv`. Highest-value
+  remaining addition.
+- **No streaming.** `/rag/chat` returns a complete answer, so there is a
+  multi-second silent gap. There's a thinking state; streaming would be better.
+- **Conversation is not sent.** Each question goes alone with injected parcel
+  context — the server takes a single `message`, so the model cannot see
+  earlier turns. Follow-ups like "what about the other one?" will not resolve.
 - **Community list.** `situs_community` has 24 exact-match values; the finder
   takes free text. `/meta` or a constant would make it a select.
 

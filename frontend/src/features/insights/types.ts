@@ -110,3 +110,15 @@ export type ParcelMatch = {
 };
 
 export type SearchResponse = { matches: ParcelMatch[] };
+
+/**
+ * POST /rag/chat — free-form permit Q&A, grounded in permit_type_stats.csv
+ * plus one Claude call. Self-hosted since the Gradio/ngrok bot was retired.
+ */
+export type RagChatRequest = { message: string };
+
+export type RagChatResponse = {
+  answer: string;
+  source: string;
+  error?: string | null;
+};
