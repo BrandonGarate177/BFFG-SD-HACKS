@@ -19,7 +19,7 @@ the route and fetches everything else itself.
 | `components/WatchOut.tsx` | every caveat, collected in one place |
 | `components/ParcelFacts.tsx` | zone, lot, ZIP, coastal jurisdiction |
 | `components/ParcelFinder.tsx` | apn lookup + `/search`, so this feature demos alone |
-| `components/ChatRail.tsx` | conversation over `/rag/chat`, context injection |
+| `components/ChatRail.tsx` | streaming conversation over `/ws/rag/chat`, context injection |
 | `components/SampleDataBanner.tsx` | sticky label for fixture mode |
 | `lib/fixture.ts` | sample response, server-unreachable only |
 
