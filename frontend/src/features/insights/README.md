@@ -13,8 +13,10 @@ the route and fetches everything else itself.
 | `InsightsPage.tsx` | route, fetch lifecycle, unavailable state |
 | `types.ts` | mirrors `server/models.py` response models |
 | `lib/api.ts` | `/parcel-detail`, `/search`, `/model-info` |
-| `components/PredictionPanel.tsx` | all four archetypes, C-index, permit fee |
-| `components/CapacityPanel.tsx` | base / ADU / JADU / SB 9 / bonus |
+| `components/HeroAnswer.tsx` | the answer: archetype selector, timing, permit fee |
+| `components/ProbabilityStrip.tsx` | nested 180d / 365d issuance bar |
+| `components/CapacityPanel.tsx` | the two competing entitlement paths |
+| `components/WatchOut.tsx` | every caveat, collected in one place |
 | `components/ParcelFacts.tsx` | zone, lot, ZIP, coastal jurisdiction |
 | `components/ParcelFinder.tsx` | apn lookup + `/search`, so this feature demos alone |
 | `components/RagPanel.tsx` | markdown answer, provenance, de-duplication |
@@ -39,6 +41,38 @@ building permit only, excluding Development Impact Fees, school fees, and
 water/sewer capacity charges, which together often exceed it. There is no
 construction-cost model in this dataset. The map's cost figure is a separate,
 assumption-based calculator — do not conflate them.
+
+## Layout intent
+
+Hero answers the user's question; everything below is evidence. They arrive
+from the map having already filtered, so the page opens on the archetype
+their parcel's capacity implies — the same rule the map filtered by, so the
+number they were looking at is the number they land on.
+
+All four predictions ship in one response, so the archetype selector costs
+no refetch. Switching it is the page's main interaction: *what if I built
+smaller?*
+
+**Timing is never a bare number.** `ProbabilityStrip` shows P(issued by
+180d / 365d) under the median, because a C-index of 0.612 does not support a
+confident point estimate. The dataset has no p75/p90 either — 29% censoring
+means the survival curves plateau — so horizon probabilities are what the
+data actually supports.
+
+**SB 9 competes with the base path, it does not add to it.**
+`cap_total = max(cap_base + cap_adu + cap_jadu, cap_sb9)`. `CapacityPanel`
+renders both paths with the winner marked; a flat six-row list hides the
+relationship. When only one path is known, neither is marked taken.
+
+**Caveats live in one panel, not scattered.** A reader can miss a caveat
+sitting beside a figure; `WatchOut` collects all of them so they can't.
+
+## The map's cost assumption arrives by URL
+
+`/parcel/:apn?hardCost=350000`. The map's slider is an assumption, not a
+model output, and this page shows the resulting construction estimate
+labelled as the user's own input. The query param is the interface — the two
+features still never import each other.
 
 ## The RAG response has two shapes
 

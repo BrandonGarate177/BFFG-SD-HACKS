@@ -23,7 +23,8 @@ export function MapPage() {
           selectedApn={selectedApn}
           onSelect={(apn) => {
             setSelectedApn(apn);
-            navigate(`/parcel/${apn}`);
+            // The URL is the interface between features - no cross-feature import.
+            navigate(`/parcel/${apn}?hardCost=${filters.hardCostPerUnit}`);
           }}
           onMatchCount={setMatchCount}
         />

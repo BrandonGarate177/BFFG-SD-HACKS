@@ -29,6 +29,14 @@ export function hasThinSupport(a: Archetype): boolean {
   return ARCHETYPE_SUPPORT[a] < THIN_SUPPORT_THRESHOLD;
 }
 
+/** Representative unit count for an archetype - the low end of its band. */
+export const ARCHETYPE_UNITS: Record<Archetype, number> = {
+  adu: 1,
+  duplex: 2,
+  "3_4_unit": 3,
+  "5plus": 5,
+};
+
 /**
  * The archetype a parcel falls into when built to full by-right capacity.
  * Mirrors the training pipeline's assignment rule, which keyed on
