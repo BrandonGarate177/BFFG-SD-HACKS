@@ -35,7 +35,12 @@ export type ParcelCapacity = {
 export type ParcelContext = {
   zone: string | null;
   nucleus_use_cd: string | null;
-  /** 24 distinct values, uppercase jurisdiction names (SAN DIEGO, LA JOLLA). */
+  /**
+   * Situs (address) community, NOT permitting jurisdiction. 24 uppercase
+   * values; 359,754 are SAN DIEGO but it also contains ESCONDIDO, SANTEE,
+   * LA MESA and RANCHO SANTA FE — parcels zoned by the City whose address
+   * falls elsewhere. Do not label this "jurisdiction".
+   */
   situs_community: string | null;
   situs_zip: string | null;
   lot_sqft: number | null;

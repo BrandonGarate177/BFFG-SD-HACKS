@@ -21,6 +21,9 @@ import type { ParcelMatch } from "../types";
 export function ParcelFinder({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
   const [archetype, setArchetype] = useState<Archetype>("adu");
+  // One flat fee per archetype in the dataset (adu 7,634 · duplex 17,236 ·
+  // 3-4 unit 7,507 · 5+ 11,857), so this is effectively a per-archetype
+  // on/off switch rather than a filter. Default clears all four.
   const [feeCap, setFeeCap] = useState(20_000);
   const [months, setMonths] = useState(24);
   const [community, setCommunity] = useState("");
@@ -113,7 +116,8 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
               {busy ? "Searching…" : "Search"}
             </button>
             <span className="text-[11px] text-dim">
-              Fee is a floor — building permit only, excludes DIF and capacity charges.
+              Permit fee is one flat value per project size, so this cap admits either every
+              parcel of that size or none — it does not rank them. Timing is what discriminates.
             </span>
           </div>
         </>
@@ -139,8 +143,11 @@ export function ParcelFinder({ compact = false }: { compact?: boolean }) {
               >
                 <span className="mono text-accent">{m.apn}</span>
                 <span className="flex gap-4 text-xs text-muted">
-                  <span className="mono">{fmtMonths(daysToMonths(m.median_days))}</span>
-                  <span className="mono">{fmtUSDExact(m.permit_fee_usd)}</span>
+                  <span className="mono text-text">{fmtMonths(daysToMonths(m.median_days))}</span>
+                  {m.prob_issued_365d != null && (
+                    <span className="mono">{Math.round(m.prob_issued_365d * 100)}% / 1yr</span>
+                  )}
+                  <span className="mono text-dim">{fmtUSDExact(m.permit_fee_usd)}</span>
                 </span>
               </button>
             </li>

@@ -37,7 +37,7 @@ export function ParcelFacts({ parcel }: { parcel: ParcelContext }) {
           value={parcel.lot_sqft == null ? "—" : `${Math.round(parcel.lot_sqft).toLocaleString()} sqft`}
         />
         <Fact label="Existing units" value={dash(parcel.existing_units)} />
-        <Fact label="Jurisdiction" value={dash(parcel.situs_community)} />
+        <Fact label="Community" value={dash(parcel.situs_community)} />
         <Fact label="ZIP" value={dash(parcel.situs_zip)} />
         <Fact label="ADU eligible" value={parcel.adu_eligible == null ? "—" : parcel.adu_eligible ? "yes" : "no"} />
         <Fact label="SB 9 eligible" value={parcel.sb9_eligible == null ? "—" : parcel.sb9_eligible ? "yes" : "no"} />

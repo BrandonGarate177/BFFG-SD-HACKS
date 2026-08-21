@@ -9,17 +9,18 @@ function Path({
   label,
   formula,
   total,
-  taken,
+  state,
 }: {
   label: string;
   formula: string;
   total: number | null;
-  taken: boolean;
+  state: "taken" | "tied" | "lost" | "unknown";
 }) {
+  const lit = state === "taken" || state === "tied";
   return (
     <div
       className={`flex items-baseline justify-between gap-3 rounded border px-3 py-2 ${
-        taken ? "border-accent/50 bg-accent/5" : "border-edge"
+        lit ? "border-accent/50 bg-accent/5" : "border-edge"
       }`}
     >
       <div className="min-w-0">
@@ -27,10 +28,15 @@ function Path({
         <div className="mono text-[11px] text-dim">{formula}</div>
       </div>
       <div className="flex items-baseline gap-2 shrink-0">
-        <span className={`mono text-lg ${taken ? "text-accent" : "text-muted"}`}>
+        <span className={`mono text-lg ${lit ? "text-accent" : "text-muted"}`}>
           {total ?? "—"}
         </span>
-        {taken && <span className="text-[10px] uppercase tracking-wider text-accent">taken</span>}
+        {state === "taken" && (
+          <span className="text-[10px] uppercase tracking-wider text-accent">taken</span>
+        )}
+        {state === "tied" && (
+          <span className="text-[10px] uppercase tracking-wider text-accent">equivalent</span>
+        )}
       </div>
     </div>
   );
@@ -44,8 +50,18 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
       ? null
       : (cap_base ?? 0) + (cap_adu ?? 0) + (cap_jadu ?? 0);
 
-  // Only claim a winner when both paths are known.
-  const sb9Wins = cap_sb9 != null && stacked != null && cap_sb9 > stacked;
+  /**
+   * Across all 333,159 parcels where both paths are known, SB 9 never
+   * exceeds the stacked path: it ties on 191,420 and loses on 141,739. So a
+   * tie is the single most common outcome, and marking one path "taken"
+   * there would read as SB 9 losing when it reaches the same number.
+   */
+  const bothKnown = cap_sb9 != null && stacked != null;
+  const pathState = (mine: number | null, other: number | null) => {
+    if (!bothKnown || mine == null || other == null) return "unknown" as const;
+    if (mine === other) return "tied" as const;
+    return mine > other ? ("taken" as const) : ("lost" as const);
+  };
 
   if (cap_total == null && delta_units == null) {
     return (
@@ -67,9 +83,14 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
           label="Base zoning + ADU"
           formula={`base ${cap_base ?? "—"} + ADU ${cap_adu ?? "—"} + JADU ${cap_jadu ?? "—"}`}
           total={stacked}
-          taken={stacked != null && !sb9Wins}
+          state={pathState(stacked, cap_sb9)}
         />
-        <Path label="SB 9 lot split" formula="alternative path" total={cap_sb9} taken={sb9Wins} />
+        <Path
+          label="SB 9 lot split"
+          formula="alternative path, not additive"
+          total={cap_sb9}
+          state={pathState(cap_sb9, stacked)}
+        />
       </div>
 
       <dl className="mt-4 space-y-1.5 border-t border-edge/60 pt-4 text-sm">
