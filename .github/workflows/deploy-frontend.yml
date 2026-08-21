@@ -56,12 +56,18 @@ jobs:
       - name: Sync site
         run: |
           rm -f frontend/dist/parcels.pmtiles
+          # No --delete. Asset filenames are content-hashed, so old bundles
+          # are harmless — and deleting them breaks any browser still holding
+          # a cached index.html: the missing file 403s, CloudFront rewrites
+          # that to index.html, and the browser gets HTML where it expects
+          # JavaScript ("SyntaxError: Unexpected token '<'").
           aws s3 sync frontend/dist "s3://${{ vars.SITE_BUCKET }}" \
-            --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude index.html
+          # must-revalidate, not just no-cache: some browsers treat plain
+          # no-cache loosely and serve a stale shell from disk.
           aws s3 cp frontend/dist/index.html "s3://${{ vars.SITE_BUCKET }}/index.html" \
-            --cache-control "no-cache"
+            --cache-control "no-cache,no-store,must-revalidate"
 
       - name: Invalidate CloudFront
         run: |
