@@ -50,6 +50,11 @@ body {
   cursor: pointer;
 }
 
+/* maplibre-gl.css is unlayered, so its `.maplibregl-map { position: relative }`
+   beats Tailwind's `@layer utilities` .absolute unconditionally regardless of
+   import order, collapsing MapCanvas's inset-0 fill container to 0 height. */
+.maplibregl-map { position: absolute !important; }
+
 /* MapLibre chrome, so its light defaults don't fight the navy shell. */
 .maplibregl-popup-content {
   background: var(--color-deep);
