@@ -12,8 +12,9 @@
   --color-ink: #1f1a14;
   /* 4.6:1 on --color-wash, the darkest surface it sits on. */
   --color-ink-2: #6f665a;
-  /* Large serif elaboration only. 2.4:1, so never body text. */
-  --color-soft: #a39a8c;
+  /* Large serif elaboration only. 3.35:1 on paper passes AA large text,
+     not body text. */
+  --color-soft: #8a8173;
 
   --color-accent: #a9392a;
   --color-accent-hi: #8f2e21;
