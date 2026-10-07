@@ -1,87 +1,123 @@
 @import "tailwindcss";
 
 @theme {
-  /* coolors.co/00296b-003f88-00509d-fdc500-ffd500 */
-  --color-ink: #001a4a;        /* page ground, darkened from 00296b for contrast headroom */
-  --color-deep: #00296b;
-  --color-panel: #003f88;
-  --color-edge: #00509d;
-  --color-accent: #fdc500;
-  --color-accent-hi: #ffd500;
+  /* Warm paper, shared with the personal site redesign. Rust is reserved for
+     primary actions; data emphasis uses ink, caveats use the caution pair. */
+  --color-paper: #f4efe6;      /* page ground */
+  --color-card: #fbf8f2;       /* panels and cards */
+  --color-wash: #efe8dc;       /* chips, inset fields, quiet fills */
+  --color-rule: #e2dbcf;       /* hairlines on paper */
+  --color-rule-soft: #ebe5da;  /* hairlines inside cards */
 
-  --color-text: #eaf0fa;
-  --color-muted: #9db6d8;
-  /* 5.35:1 on --color-panel. #6b8cb8 was 2.94:1 and failed WCAG AA
-     everywhere on the dashboard, which is entirely bg-panel. */
-  --color-dim: #a8bedb;
+  --color-ink: #1f1a14;
+  /* 4.6:1 on --color-wash, the darkest surface it sits on. */
+  --color-ink-2: #6f665a;
+  /* Large serif elaboration only. 2.4:1, so never body text. */
+  --color-soft: #a39a8c;
+
+  --color-accent: #a9392a;
+  --color-accent-hi: #8f2e21;
+  --color-ok: #2f6b4f;
+  --color-ok-bg: #e3efe8;
+  /* Caveats and warnings. 6:1 on --color-caution-bg. */
+  --color-caution: #7a4f0e;
+  --color-caution-bg: #f6ecd9;
+  --color-caution-rule: #e6cf9f;
+  --color-danger: #9b2c1f;
+
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: "Libre Caslon Display", Georgia, serif;
 }
 
-/* Native controls (select popups, range tracks, scrollbars) render dark
-   instead of light-on-navy. */
-html { color-scheme: dark; }
+html { color-scheme: light; }
 
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: var(--color-ink);
-  color: var(--color-text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mono { font-family: var(--font-mono); }
+
+/* Mono uppercase labels, the eyebrow from the personal site. */
+.eyebrow {
+  font: 500 11px/1.2 var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+/* One focus ring for every control, visible on paper and on cards. */
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
 
 /* Tailwind's list-none does not reach Safari's own disclosure triangle. */
 summary::-webkit-details-marker { display: none; }
 
-/* Range inputs: palette track, accent thumb. */
-.range-accent {
+/* Range inputs: hairline track, ink thumb. */
+.range-ink {
   appearance: none;
   width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+.range-ink::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 999px;
-  background: var(--color-edge);
-  outline: none;
+  background: var(--color-rule);
 }
-.range-accent::-webkit-slider-thumb {
+.range-ink::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-rule);
+}
+.range-ink::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
   height: 16px;
+  margin-top: -6.5px;
   border-radius: 999px;
-  background: var(--color-accent);
-  border: 2px solid var(--color-deep);
-  cursor: pointer;
-  box-shadow: 0 0 0 1px var(--color-accent);
+  background: var(--color-ink);
+  border: 3px solid var(--color-card);
+  box-shadow: 0 0 0 1px var(--color-ink), 0 2px 6px -2px rgba(43,29,18,.5);
 }
-.range-accent::-moz-range-thumb {
-  width: 16px; height: 16px; border-radius: 999px;
-  background: var(--color-accent);
-  border: 2px solid var(--color-deep);
-  cursor: pointer;
+.range-ink::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 999px;
+  background: var(--color-ink);
+  border: 3px solid var(--color-card);
+  box-shadow: 0 0 0 1px var(--color-ink);
 }
+.range-ink:focus-visible { outline-offset: 4px; }
 
 /* maplibre-gl.css is unlayered, so its `.maplibregl-map { position: relative }`
    beats Tailwind's `@layer utilities` .absolute unconditionally regardless of
    import order, collapsing MapCanvas's inset-0 fill container to 0 height. */
 .maplibregl-map { position: absolute !important; }
 
-/* MapLibre chrome, so its light defaults don't fight the navy shell. */
-.maplibregl-popup-content {
-  background: var(--color-deep);
-  color: var(--color-text);
-  border: 1px solid var(--color-edge);
-  border-radius: 10px;
-}
-.maplibregl-popup-tip { border-top-color: var(--color-deep) !important; }
-.maplibregl-ctrl-attrib { background: rgba(0,26,74,.72) !important; }
-.maplibregl-ctrl-attrib a { color: var(--color-dim) !important; }
+/* MapLibre chrome, matched to the paper cards. */
+.maplibregl-map { font-family: var(--font-sans); }
 .maplibregl-ctrl-group {
-  background: var(--color-deep) !important;
-  border: 1px solid var(--color-edge) !important;
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-rule) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 24px -14px rgba(43,29,18,.45) !important;
 }
-.maplibregl-ctrl-group button + button { border-top-color: var(--color-edge) !important; }
-.maplibregl-ctrl-group button span { filter: invert(1) brightness(1.6); }
+.maplibregl-ctrl-group button + button { border-top-color: var(--color-rule-soft) !important; }
+.maplibregl-ctrl-attrib {
+  background: rgba(251,248,242,.85) !important;
+  color: var(--color-ink-2) !important;
+  font-size: 11px;
+}
+.maplibregl-ctrl-attrib a { color: var(--color-ink-2) !important; }
 .maplibregl-ctrl-scale {
-  background: rgba(0,26,74,.72) !important;
-  border-color: var(--color-edge) !important;
-  color: var(--color-muted) !important;
+  background: rgba(251,248,242,.85) !important;
+  border-color: var(--color-ink-2) !important;
+  color: var(--color-ink-2) !important;
+  font: 500 10px/1.4 var(--font-mono);
 }

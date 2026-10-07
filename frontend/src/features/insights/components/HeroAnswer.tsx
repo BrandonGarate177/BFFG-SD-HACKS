@@ -38,10 +38,10 @@ function Figure({
 }) {
   return (
     <div>
-      <div className={`text-4xl font-semibold tracking-tight ${muted ? "text-muted" : "text-accent"}`}>
+      <div className={`font-serif text-5xl leading-none ${muted ? "text-ink-2" : "text-ink"}`}>
         {value}
       </div>
-      <div className="mt-1 text-sm text-muted">{label}</div>
+      <div className="mt-2 text-sm text-ink-2">{label}</div>
     </div>
   );
 }
@@ -70,18 +70,21 @@ export function HeroAnswer({
   const exceedsCapacity = !noPath && capacityUnits != null && units > capacityUnits;
 
   return (
-    <section className="rounded-lg border border-edge bg-panel p-6">
+    <section className="rounded-2xl border border-rule bg-card p-5 shadow-[0_20px_40px_-28px_rgba(43,29,18,.35)] sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">{HEADLINE[archetype]}</h2>
+        <div>
+          <div className="eyebrow">Project size</div>
+          <h2 className="mt-2 font-serif text-4xl leading-none sm:text-[44px]">{HEADLINE[archetype]}</h2>
+        </div>
 
-        <div className="flex overflow-hidden rounded border border-edge">
+        <div className="flex flex-wrap gap-1 rounded-full border border-rule bg-wash p-1">
           {ARCHETYPES.map((a) => (
             <button
               key={a}
               onClick={() => onArchetype(a)}
               aria-pressed={a === archetype}
-              className={`px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-accent ${
-                a === archetype ? "bg-accent font-semibold text-ink" : "text-muted hover:text-text"
+              className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+                a === archetype ? "bg-ink font-medium text-paper" : "text-ink-2 hover:text-ink"
               }`}
             >
               {ARCHETYPE_LABEL[a]}
@@ -91,9 +94,9 @@ export function HeroAnswer({
       </div>
 
       {noPath ? (
-        <div className="mt-5 rounded border-2 border-dashed border-edge p-5">
-          <div className="text-2xl font-semibold text-muted">No by-right path here</div>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+        <div className="mt-6 rounded-xl border border-dashed border-ink-2/50 bg-paper p-5">
+          <div className="font-serif text-3xl leading-tight text-ink">No by-right path here</div>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
             {capacityUnits == null
               ? "This zone has no quantifiable residential entitlement — about 15% of parcels."
               : !eligible
@@ -104,11 +107,11 @@ export function HeroAnswer({
           </p>
           <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-2 text-sm">
             <div className="flex gap-2">
-              <dt className="text-muted">Comparable timing</dt>
+              <dt className="text-ink-2">Comparable timing</dt>
               <dd className="mono">{months == null ? "—" : `~${months.toFixed(1)} mo`}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="text-muted">Comparable permit fee</dt>
+              <dt className="text-ink-2">Comparable permit fee</dt>
               <dd className="mono">
                 {prediction?.permit_fee_usd == null ? "—" : fmtUSD(prediction.permit_fee_usd)}
               </dd>
@@ -117,11 +120,11 @@ export function HeroAnswer({
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-6 sm:grid-cols-3">
+          <div className="mt-7 grid gap-6 border-t border-rule-soft pt-6 sm:grid-cols-3 sm:gap-8">
             <div className="space-y-2">
               <Figure value={capacityUnits} label="unbuilt homes zoning already permits" />
               {exceedsCapacity && (
-                <p className="text-sm leading-relaxed text-accent">
+                <p className="rounded-md bg-caution-bg px-2.5 py-2 text-sm leading-relaxed text-caution">
                   A {ARCHETYPE_LABEL[archetype]} project needs {units}. Timing below is what
                   comparable projects took.
                 </p>
@@ -134,13 +137,13 @@ export function HeroAnswer({
                 p180={prediction?.prob_issued_180d ?? null}
                 p365={prediction?.prob_issued_365d ?? null}
               />
-              <p className="text-sm text-muted">
-                C-index <span className="mono text-text">{MODEL.cIndex.toFixed(3)}</span> · chance{" "}
+              <p className="text-sm text-ink-2">
+                C-index <span className="mono text-ink">{MODEL.cIndex.toFixed(3)}</span> · chance{" "}
                 {MODEL.cIndexChance.toFixed(3)} · linear baseline{" "}
                 {MODEL.cIndexBaselineCox.toFixed(3)}
               </p>
               {hasThinSupport(archetype) && (
-                <p className="text-sm text-accent">
+                <p className="rounded-md bg-caution-bg px-2.5 py-2 text-sm text-caution">
                   Under 1,000 training permits at this size — directional only.
                 </p>
               )}
@@ -152,21 +155,21 @@ export function HeroAnswer({
                 label="permit fee"
                 muted
               />
-              <p className="text-sm leading-relaxed text-muted">
+              <p className="text-sm leading-relaxed text-ink-2">
                 Building permit only — a floor, and unverified against DSD's published table.
                 Excludes school fees and water/sewer capacity charges.
                 {prediction?.owes_dif && (
-                  <span className="text-accent">
+                  <span className="font-medium text-caution">
                     {" "}
                     Development Impact Fees also apply and often exceed it.
                   </span>
                 )}
               </p>
               {hardCostPerUnit != null && (
-                <p className="rounded border border-edge bg-ink/40 p-2.5 text-sm leading-relaxed text-muted">
+                <p className="rounded-md bg-wash p-2.5 text-sm leading-relaxed text-ink-2">
                   At your {fmtUSD(hardCostPerUnit)}/unit assumption, {units}{" "}
                   {units === 1 ? "unit" : "units"} is roughly{" "}
-                  <span className="mono text-text">{fmtUSD(units * hardCostPerUnit)}</span> to build —
+                  <span className="mono text-ink">{fmtUSD(units * hardCostPerUnit)}</span> to build —
                   your assumption, not a model output.
                 </p>
               )}
@@ -178,8 +181,8 @@ export function HeroAnswer({
             this the page reads as a pure land-use tool, and a judge has to
             infer the affordability connection themselves.
           */}
-          <p className="mt-6 border-t border-edge pt-4 text-base leading-relaxed text-muted">
-            San Diego's code <strong className="text-text">already permits these homes</strong>. What
+          <p className="mt-7 border-t border-rule-soft pt-5 text-base leading-relaxed text-ink-2">
+            San Diego's code <strong className="font-medium text-ink">already permits these homes</strong>. What
             stands between them and a household is the time and cost above — and for an
             owner-built ADU, that wait is rent the owner is not collecting while they carry the
             loan.

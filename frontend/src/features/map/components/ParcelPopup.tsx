@@ -25,55 +25,55 @@ export function ParcelPopup({ parcel, x, y, hardCostPerUnit }: Props) {
 
   return (
     <div
-      className="pointer-events-none absolute z-20 w-64 rounded-lg border border-edge bg-panel/97 p-3 shadow-2xl backdrop-blur"
+      className="pointer-events-none absolute z-20 w-64 rounded-xl border border-rule bg-card/97 p-3.5 shadow-[0_24px_48px_-20px_rgba(43,29,18,.55)] backdrop-blur"
       style={{ left: Math.min(x + 14, window.innerWidth - 290), top: Math.max(y - 10, 8) }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="mono text-[11px] text-muted">{parcel.apn}</span>
-        <span className="mono text-[11px] text-accent">{parcel.zone}</span>
+        <span className="mono text-[11px] text-ink-2">{parcel.apn}</span>
+        <span className="mono rounded-full bg-wash px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-ink-2">{parcel.zone}</span>
       </div>
-      <div className="mt-0.5 text-sm font-medium">{parcel.situs_community ?? "Community unknown"}</div>
+      <div className="mt-1 font-serif text-xl leading-tight">{parcel.situs_community ?? "Community unknown"}</div>
 
       {econ ? (
-        <dl className="mt-3 space-y-1.5 text-xs">
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">By-right capacity</dt>
+        <dl className="mt-3 divide-y divide-rule-soft border-t border-rule-soft text-xs">
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">By-right capacity</dt>
             <dd className="mono">+{econ.units} {econ.units === 1 ? "unit" : "units"}</dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Project size</dt>
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">Project size</dt>
             <dd className="mono">{ARCHETYPE_LABEL[econ.archetype]}</dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Est. build cost</dt>
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">Est. build cost</dt>
             <dd className="mono">{fmtUSD(econ.cost)}</dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Median to permit</dt>
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">Median to permit</dt>
             <dd className="mono">{fmtMonths(econ.predMonths)}</dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Issued within 1yr</dt>
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">Issued within 1yr</dt>
             <dd className="mono">{Math.round((parcel[PROB_1YR_FIELD[econ.archetype]] as number) * 100)}%</dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Lot</dt>
+          <div className="flex justify-between gap-3 py-1.5">
+            <dt className="text-ink-2">Lot</dt>
             <dd className="mono">{parcel.lot_sqft.toLocaleString()} sqft · {parcel.existing_units} built</dd>
           </div>
         </dl>
       ) : (
-        <p className="mt-3 text-xs text-dim">
+        <p className="mt-3 text-xs text-ink-2">
           No quantifiable residential entitlement in this zone.
         </p>
       )}
 
       {econ && hasThinSupport(econ.archetype) && (
-        <p className="mt-2 text-[10px] leading-snug text-accent">
+        <p className="mt-2 rounded-md bg-caution-bg px-2 py-1.5 text-[11px] leading-snug text-caution">
           Thin training support ({ARCHETYPE_SUPPORT[econ.archetype]} permits) — directional only.
         </p>
       )}
       {parcel.coastal_deferred_certification && (
-        <p className="mt-2 text-[10px] leading-snug text-accent-hi">
+        <p className="mt-2 rounded-md bg-caution-bg px-2 py-1.5 text-[11px] leading-snug text-caution">
           Deferred certification — the Coastal Commission permits here, not the City.
         </p>
       )}

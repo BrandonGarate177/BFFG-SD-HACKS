@@ -19,23 +19,23 @@ function Path({
   const lit = state === "taken" || state === "tied";
   return (
     <div
-      className={`flex items-baseline justify-between gap-3 rounded border px-3 py-2 ${
-        lit ? "border-accent/50 bg-accent/5" : "border-edge"
+      className={`flex items-baseline justify-between gap-3 rounded-xl border px-3.5 py-2.5 ${
+        lit ? "border-ink/40 bg-paper" : "border-rule-soft"
       }`}
     >
       <div className="min-w-0">
         <div className="text-sm">{label}</div>
-        <div className="mono text-sm text-dim">{formula}</div>
+        <div className="mono text-xs text-ink-2">{formula}</div>
       </div>
       <div className="flex items-baseline gap-2 shrink-0">
-        <span className={`mono text-lg ${lit ? "text-accent" : "text-muted"}`}>
+        <span className={`font-serif text-2xl leading-none ${lit ? "text-ink" : "text-ink-2"}`}>
           {total ?? "—"}
         </span>
         {state === "taken" && (
-          <span className="text-xs uppercase tracking-wider text-accent">taken</span>
+          <span className="mono rounded-full bg-ok-bg px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-ok">taken</span>
         )}
         {state === "tied" && (
-          <span className="text-xs uppercase tracking-wider text-accent">equivalent</span>
+          <span className="mono rounded-full bg-ok-bg px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-ok">equivalent</span>
         )}
       </div>
     </div>
@@ -65,9 +65,9 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
 
   if (cap_total == null && delta_units == null) {
     return (
-      <section className="rounded-lg border border-edge bg-panel p-5">
-        <h2 className="text-sm uppercase tracking-wider text-muted">By-right capacity</h2>
-        <p className="mt-3 text-sm text-dim">
+      <section className="rounded-2xl border border-rule bg-card p-5 sm:p-6">
+        <h2 className="eyebrow">By-right capacity</h2>
+        <p className="mt-3 text-sm text-ink-2">
           No quantifiable residential entitlement in this zone — about 15% of parcels.
         </p>
       </section>
@@ -75,8 +75,8 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
   }
 
   return (
-    <section className="rounded-lg border border-edge bg-panel p-5">
-      <h2 className="text-sm uppercase tracking-wider text-muted">By-right capacity</h2>
+    <section className="rounded-2xl border border-rule bg-card p-5 sm:p-6">
+      <h2 className="eyebrow">By-right capacity</h2>
 
       <div className="mt-4 space-y-2">
         <Path
@@ -93,21 +93,21 @@ export function CapacityPanel({ capacity }: { capacity: ParcelCapacity }) {
         />
       </div>
 
-      <dl className="mt-4 space-y-1.5 border-t border-edge/60 pt-4 text-sm">
+      <dl className="mt-4 space-y-1.5 border-t border-rule-soft pt-4 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-muted">Total permitted</dt>
+          <dt className="text-ink-2">Total permitted</dt>
           <dd className="mono">{cap_total ?? "—"}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="font-medium">Unbuilt capacity</dt>
-          <dd className="mono text-accent">{delta_units ?? "—"}</dd>
+          <dd className="mono font-medium">{delta_units ?? "—"}</dd>
         </div>
       </dl>
 
       {cap_adu_bonus_max != null && (
-        <p className="mt-4 rounded border border-accent/40 bg-accent/5 p-2.5 text-sm leading-relaxed">
-          ADU Bonus ceiling <span className="mono text-accent">{cap_adu_bonus_max}</span> —{" "}
-          <strong>not by-right.</strong> Every bonus unit needs a deed-restricted affordable ADU
+        <p className="mt-4 rounded-md border border-caution-rule bg-caution-bg p-2.5 text-sm leading-relaxed">
+          ADU Bonus ceiling <span className="mono font-medium">{cap_adu_bonus_max}</span> —{" "}
+          <strong className="text-caution">not by-right.</strong> Every bonus unit needs a deed-restricted affordable ADU
           plus a Sustainable Development Area location.
         </p>
       )}

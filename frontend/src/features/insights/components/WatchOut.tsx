@@ -80,20 +80,20 @@ export function WatchOut({
   });
 
   return (
-    <section className="rounded-lg border border-edge bg-panel p-5">
+    <section className="rounded-2xl border border-rule bg-card p-5 sm:p-6">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm uppercase tracking-wider text-muted">Watch out</h2>
-        <span className="mono text-sm text-dim">as of {modelInfo.predictions_as_of}</span>
+        <h2 className="eyebrow">Watch out</h2>
+        <span className="mono text-xs text-ink-2">as of {modelInfo.predictions_as_of}</span>
       </div>
 
-      <ul className="mt-4 space-y-2.5">
+      <ul className="mt-4 space-y-2">
         {items.map((item, i) => (
           <li
             key={i}
-            className={`rounded border p-2.5 text-sm leading-relaxed ${
+            className={`rounded-xl border px-3.5 py-2.5 text-sm leading-relaxed ${
               item.severity === "high"
-                ? "border-accent/50 bg-accent/5"
-                : "border-edge bg-ink/30 text-muted"
+                ? "border-caution-rule bg-caution-bg text-ink"
+                : "border-rule-soft bg-paper text-ink-2 [&_strong]:font-medium [&_strong]:text-ink"
             }`}
           >
             {item.text}

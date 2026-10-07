@@ -219,10 +219,20 @@ export function ChatRail({
   const notLive = shown.some((t) => t.role === "assistant" && t.source && t.source !== "live");
 
   return (
-    <section className="flex max-h-[calc(100vh-6rem)] flex-col rounded-lg border border-edge bg-panel">
-      <header className="flex items-baseline justify-between gap-2 border-b border-edge px-5 py-3">
-        <h2 className="text-sm uppercase tracking-wider text-muted">Assistant</h2>
-        {notLive && <span className="mono text-sm text-accent">not retrieved</span>}
+    <section className="flex max-h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-2xl border border-rule bg-card shadow-[0_20px_40px_-28px_rgba(43,29,18,.35)]">
+      <header className="flex items-center justify-between gap-2 border-b border-rule-soft px-5 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 rounded-full ${notLive ? "bg-caution" : "bg-ok shadow-[0_0_0_3px_rgba(47,107,79,.15)]"}`}
+          />
+          <h2 className="font-serif text-xl leading-none">Assistant</h2>
+        </div>
+        {notLive && (
+          <span className="mono rounded-full bg-caution-bg px-2.5 py-1 text-[10.5px] uppercase tracking-wide text-caution">
+            not retrieved
+          </span>
+        )}
       </header>
 
       <div
@@ -232,11 +242,11 @@ export function ChatRail({
       >
         {shown.map((turn, i) =>
           turn.role === "user" ? (
-            <p key={i} className="ml-6 rounded-lg bg-edge/50 px-3 py-2 text-sm">
+            <p key={i} className="ml-8 rounded-[12px_12px_4px_12px] bg-wash px-3.5 py-2 text-sm">
               {turn.text}
             </p>
           ) : turn.pending && !turn.text ? (
-            <p key={i} className="text-sm text-dim">
+            <p key={i} className="text-sm text-ink-2">
               Thinking<span className="animate-pulse">…</span>
             </p>
           ) : (
@@ -244,13 +254,13 @@ export function ChatRail({
             // source is unknown until "done", so no badge until then.
             <div key={i} className="space-y-1">
               {turn.source && turn.source !== "live" && (
-                <p className="rounded border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-sm leading-relaxed">
+                <p className="rounded-md border border-caution-rule bg-caution-bg px-2.5 py-1.5 text-sm leading-relaxed text-caution">
                   {turn.source === "mock"
                     ? "Placeholder — not grounded in the permit statistics."
                     : "The assistant could not be reached."}
                 </p>
               )}
-              <div className="text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mt-1 [&_p]:mt-2 [&_strong]:text-text [&_h2]:mt-3 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-muted">
+              <div className="text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mt-1 [&_p]:mt-2 [&_strong]:font-medium [&_h2]:mt-4 [&_h2]:font-mono [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-[.12em] [&_h2]:text-ink-2">
                 <Markdown>{turn.text}</Markdown>
               </div>
             </div>
@@ -259,12 +269,12 @@ export function ChatRail({
       </div>
 
       {!disabled && turns.length === 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-edge px-5 py-3">
+        <div className="flex flex-wrap gap-1.5 border-t border-rule-soft bg-paper/60 px-5 py-3">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
               onClick={() => send(s)}
-              className="rounded-full border border-edge px-2.5 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-text"
+              className="rounded-full border border-rule bg-card px-3 py-1 text-left text-sm text-ink-2 transition-colors hover:border-ink hover:text-ink"
             >
               {s}
             </button>
@@ -273,14 +283,15 @@ export function ChatRail({
       )}
 
       <form
-        className="flex gap-2 border-t border-edge p-3"
+        className="flex gap-2 border-t border-rule-soft p-3"
         onSubmit={(e) => {
           e.preventDefault();
           send(draft);
         }}
       >
         <input
-          className="flex-1 rounded border border-edge bg-ink px-2.5 py-1.5 text-sm outline-none focus:border-accent disabled:opacity-50"
+          aria-label="Ask about this parcel"
+          className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-2/70 focus:border-ink disabled:opacity-50"
           placeholder={disabled ? "Unavailable in sample mode" : "Ask about this parcel…"}
           value={draft}
           disabled={disabled || busy}
@@ -289,7 +300,7 @@ export function ChatRail({
         <button
           type="submit"
           disabled={disabled || busy || !draft.trim()}
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-ink disabled:opacity-40"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hi disabled:opacity-40"
         >
           Ask
         </button>

@@ -5,15 +5,15 @@
  */
 export function SampleDataBanner({ reason }: { reason: string }) {
   return (
-    <div className="sticky top-0 z-30 -mx-6 mb-2 border-y-2 border-accent bg-accent/15 px-6 py-2.5 backdrop-blur lg:-mx-10 lg:px-10">
+    <div className="sticky top-0 z-30 -mx-4 mb-2 border-y-2 border-caution bg-caution-bg/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="rounded bg-accent px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-ink">
+        <span className="mono rounded-full bg-caution px-2.5 py-0.5 text-xs font-medium uppercase tracking-wider text-card">
           Sample data
         </span>
-        <span className="text-sm text-text">
+        <span className="text-sm font-medium text-ink">
           Every number on this page is invented. The server could not be reached.
         </span>
-        <span className="mono text-sm text-muted">{reason}</span>
+        <span className="mono text-sm text-ink-2">{reason}</span>
       </div>
     </div>
   );
