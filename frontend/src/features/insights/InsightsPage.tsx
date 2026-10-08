@@ -8,7 +8,7 @@ import { SAMPLE_PARCEL_DETAIL } from "./lib/fixture";
 import { CapacityPanel } from "./components/CapacityPanel";
 import { HeroAnswer } from "./components/HeroAnswer";
 import { ParcelFacts } from "./components/ParcelFacts";
-import { ParcelFinder } from "./components/ParcelFinder";
+import { FinderHero } from "./components/FinderHero";
 import { ChatRail } from "./components/ChatRail";
 import { SampleDataBanner } from "./components/SampleDataBanner";
 import { WatchOut } from "./components/WatchOut";
@@ -110,73 +110,94 @@ export function InsightsPage() {
       : "adu");
 
   return (
-    <div className="mx-auto max-w-6xl p-6 lg:p-10 space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link to="/" className="text-sm text-muted hover:text-text">
-          &larr; Map
-        </Link>
-        {apn && <span className="mono text-sm text-accent">{apn}</span>}
-        {detail?.parcel.situs_community && (
-          <span className="text-sm text-muted">
-            {detail.parcel.situs_community}
-            {detail.parcel.situs_zip ? ` · ${detail.parcel.situs_zip}` : ""}
-          </span>
-        )}
-        {detail?.parcel.zone && (
-          <span className="mono ml-auto text-sm text-muted">{detail.parcel.zone}</span>
-        )}
-      </div>
-
-      {sampleReason && <SampleDataBanner reason={sampleReason} />}
-
-      {!detail && !loading && <ParcelFinder />}
-
-      {loading && <p className="text-sm text-dim">Loading…</p>}
-
-      {unavailable && !sampleReason && (
-        <div className="rounded-lg border border-accent/50 bg-accent/5 p-4 space-y-2">
-          <div className="text-sm font-medium text-accent">No detail for this APN</div>
-          <p className="text-xs leading-relaxed text-muted">{unavailable}</p>
-          <p className="text-xs leading-relaxed text-dim">
-            Coverage is the City of San Diego only — 393,755 of the county's ~1.09M parcels. The
-            map is also running on generated geometry, so APNs reached by clicking it are
-            synthetic and will not resolve. Search above for a real one, or check the server at{" "}
-            <code className="mono">{API_BASE}</code>.
-          </p>
+    <div className="min-h-full">
+      <nav className="border-b border-rule">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-10">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 rounded-full border border-ink px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-ink hover:text-paper"
+          >
+            &larr; Map
+          </Link>
+          <span className="hidden font-serif text-xl leading-none sm:inline">By-Right</span>
+          {apn && <span className="mono text-sm text-ink">{apn}</span>}
+          {detail?.parcel.situs_community && (
+            <span className="text-sm text-ink-2">
+              {detail.parcel.situs_community}
+              {detail.parcel.situs_zip ? ` · ${detail.parcel.situs_zip}` : ""}
+            </span>
+          )}
+          {detail?.parcel.zone && (
+            <span className="mono ml-auto rounded-full bg-wash px-2.5 py-1 text-xs uppercase tracking-wide text-ink-2">
+              {detail.parcel.zone}
+            </span>
+          )}
         </div>
-      )}
+      </nav>
 
-      {detail && (
-        <>
-          <HeroAnswer
-            archetype={selected}
-            onArchetype={setArchetype}
-            prediction={detail.predictions[selected]}
-            capacity={detail.capacity}
-            parcel={detail.parcel}
-            hardCostPerUnit={hardCostPerUnit}
-          />
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+        {sampleReason && <SampleDataBanner reason={sampleReason} />}
 
-          <div className="grid gap-6 lg:grid-cols-5">
-            <div className="space-y-6 lg:col-span-3">
-              <CapacityPanel capacity={detail.capacity} />
-              <WatchOut parcel={detail.parcel} modelInfo={detail.model_info} />
-              <ParcelFacts parcel={detail.parcel} />
-            </div>
+        {/* Ahead of the finder, so a bad APN is not explained below the fold. */}
+        {unavailable && !sampleReason && (
+          <div className="space-y-2 rounded-xl border border-caution-rule bg-caution-bg p-4">
+            <div className="text-sm font-medium text-caution">No detail for this APN</div>
+            <p className="text-xs leading-relaxed text-ink">{unavailable}</p>
+            <p className="text-xs leading-relaxed text-ink-2">
+              Coverage is the City of San Diego only — 393,755 of the county's ~1.09M parcels. The
+              map is also running on generated geometry, so APNs reached by clicking it are
+              synthetic and will not resolve. Search below for a real one, or check the server at{" "}
+              <code className="mono">{API_BASE}</code>.
+            </p>
+          </div>
+        )}
 
-            <div className="lg:col-span-2">
-              <div className="lg:sticky lg:top-6">
-                <ChatRail
-                  detail={detail}
-                  rag={rag}
-                  archetype={selected}
-                  disabled={Boolean(sampleReason)}
-                />
-              </div>
+        {!detail && !loading && <FinderHero />}
+
+        {loading && (
+          <div aria-busy="true" className="space-y-4 rounded-2xl border border-rule bg-card p-6">
+            <div className="eyebrow">Loading parcel {apn}</div>
+            <div className="h-9 w-56 animate-pulse rounded-md bg-wash" />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="h-20 animate-pulse rounded-md bg-wash" />
+              <div className="h-20 animate-pulse rounded-md bg-wash" />
+              <div className="h-20 animate-pulse rounded-md bg-wash" />
             </div>
           </div>
-        </>
-      )}
+        )}
+
+        {detail && (
+          <>
+            <HeroAnswer
+              archetype={selected}
+              onArchetype={setArchetype}
+              prediction={detail.predictions[selected]}
+              capacity={detail.capacity}
+              parcel={detail.parcel}
+              hardCostPerUnit={hardCostPerUnit}
+            />
+
+            <div className="grid gap-6 lg:grid-cols-5">
+              <div className="space-y-6 lg:col-span-3">
+                <CapacityPanel capacity={detail.capacity} />
+                <WatchOut parcel={detail.parcel} modelInfo={detail.model_info} />
+                <ParcelFacts parcel={detail.parcel} />
+              </div>
+
+              <div className="lg:col-span-2">
+                <div className="lg:sticky lg:top-6">
+                  <ChatRail
+                    detail={detail}
+                    rag={rag}
+                    archetype={selected}
+                    disabled={Boolean(sampleReason)}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

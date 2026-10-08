@@ -27,32 +27,96 @@ export const L_BASE = "parcels-base";
 export const L_MATCH_POLY = "parcels-match-poly";
 export const L_MATCH_DOTS = "parcels-match-dots";
 export const L_SELECTED = "parcels-selected";
+/** Parcel layers are inserted under this one, so they never bury place names. */
+const BASEMAP_LABELS = "basemap-labels";
 
+/**
+ * Basemap: OpenFreeMap's OpenMapTiles vector source, drawn in the app's warm
+ * paper palette. Keyless and free for any use, unlike the CARTO raster tiles
+ * this replaced, which began answering with "API key required" watermarks.
+ * Only water, parks, major roads and place names are drawn - the parcels are
+ * the content, the basemap is just orientation.
+ */
 const BASE_STYLE: StyleSpecification = {
   version: 8,
-  glyphs: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/{fontstack}/{range}.pbf",
+  glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   sources: {
     basemap: {
-      type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors © CARTO",
+      type: "vector",
+      url: "https://tiles.openfreemap.org/planet",
+      attribution:
+        '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>',
     },
   },
   layers: [
-    { id: "bg", type: "background", paint: { "background-color": "#001a4a" } },
-    { id: "basemap", type: "raster", source: "basemap", paint: { "raster-opacity": 0.38 } },
+    { id: "bg", type: "background", paint: { "background-color": "#f1ece2" } },
+    {
+      id: "park", type: "fill", source: "basemap", "source-layer": "park",
+      paint: { "fill-color": "#e3e3cf", "fill-opacity": 0.8 },
+    },
+    {
+      id: "water", type: "fill", source: "basemap", "source-layer": "water",
+      paint: { "fill-color": "#cfd8d5" },
+    },
+    {
+      id: "roads-minor", type: "line", source: "basemap", "source-layer": "transportation",
+      minzoom: 13,
+      filter: ["in", ["get", "class"], ["literal", ["minor", "service", "tertiary"]]],
+      paint: {
+        "line-color": "#e4ddd0",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.5, 17, 4],
+      },
+    },
+    {
+      id: "roads-major", type: "line", source: "basemap", "source-layer": "transportation",
+      filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary"]]],
+      paint: {
+        "line-color": "#d8cfbf",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 13, 1.6, 17, 7],
+      },
+    },
+    {
+      id: BASEMAP_LABELS, type: "symbol", source: "basemap", "source-layer": "place",
+      filter: ["in", ["get", "class"], ["literal", ["city", "town", "suburb", "neighbourhood"]]],
+      layout: {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10, 10, 15, 13],
+        "text-transform": "uppercase",
+        "text-letter-spacing": 0.08,
+        "text-max-width": 8,
+      },
+      paint: {
+        "text-color": "#6f665a",
+        "text-halo-color": "#f4efe6",
+        "text-halo-width": 1.4,
+      },
+    },
   ],
 };
 
-/** Capacity drives fill colour on both the dot and polygon layers. */
+/**
+ * Capacity drives fill colour on both the dot and polygon layers. One hue,
+ * light to dark, and kept apart from the rust accent the UI saves for
+ * actions. The lightest step holds 3:1 against the paper ground at the fill
+ * opacity below, so even a one-unit parcel stays visible. Exported so the
+ * legend draws from the same stops.
+ */
+export const CAPACITY_STOPS: ReadonlyArray<readonly [units: number, color: string]> = [
+  [1, "#a36c1f"],
+  [3, "#8a5318"],
+  [6, "#6c3913"],
+  [12, "#4a240c"],
+];
+
 const CAPACITY_COLOR: unknown[] = [
   "interpolate", ["linear"], ["get", "delta_units"],
-  1, "#7a6410",
-  3, "#b8930c",
-  6, "#fdc500",
-  12, "#ffd500",
+  ...CAPACITY_STOPS.flat(),
 ];
+
+/** Parcels with capacity that fall outside the current filter. */
+export const CONTEXT_COLOR = "#7d8a96";
+export const CONTEXT_OPACITY = 0.3;
 
 export function createMap(container: HTMLDivElement): Map {
   const map = new maplibregl.Map({
@@ -96,8 +160,8 @@ export function createMap(container: HTMLDivElement): Map {
       source: SRC,
       ...vectorLayer,
       filter: [">", ["get", "delta_units"], 0] as never,
-      paint: { "fill-color": "#00509d", "fill-opacity": 0.34 },
-    });
+      paint: { "fill-color": CONTEXT_COLOR, "fill-opacity": CONTEXT_OPACITY },
+    }, BASEMAP_LABELS);
 
     // Below the zoom where lots are legible, draw centroids instead.
     // Only meaningful for the generated centroid source. Vector tiles hold
@@ -113,9 +177,9 @@ export function createMap(container: HTMLDivElement): Map {
         "circle-color": CAPACITY_COLOR as never,
         "circle-opacity": 0.85,
         "circle-stroke-width": ["case", ["boolean", ["feature-state", "hover"], false], 1.5, 0],
-        "circle-stroke-color": "#ffd500",
+        "circle-stroke-color": "#1f1a14",
       },
-    });
+    }, BASEMAP_LABELS);
 
     map.addLayer({
       id: L_MATCH_POLY,
@@ -127,9 +191,9 @@ export function createMap(container: HTMLDivElement): Map {
       ...(TILES_URL ? {} : { minzoom: DOT_TO_POLYGON_ZOOM }),
       paint: {
         "fill-color": CAPACITY_COLOR as never,
-        "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.95, 0.72],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0.85],
       },
-    });
+    }, BASEMAP_LABELS);
 
     map.addLayer({
       id: L_SELECTED,
@@ -137,8 +201,9 @@ export function createMap(container: HTMLDivElement): Map {
       source: SRC,
       ...vectorLayer,
       filter: ["==", ["get", "apn"], ""] as never,
-      paint: { "line-color": "#ffd500", "line-width": 2.5 },
-    });
+      // Blue, so the selection reads against every step of the brown ramp.
+      paint: { "line-color": "#1f5f8b", "line-width": 3 },
+    }, BASEMAP_LABELS);
   });
 
   return map;

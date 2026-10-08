@@ -14,7 +14,7 @@ export function ProbabilityStrip({
   p365: number | null;
 }) {
   if (p180 == null && p365 == null) {
-    return <p className="text-xs text-dim">No issuance probabilities for this parcel.</p>;
+    return <p className="text-xs text-ink-2">No issuance probabilities for this parcel.</p>;
   }
 
   const a = Math.max(0, Math.min(1, p180 ?? 0));
@@ -22,25 +22,25 @@ export function ProbabilityStrip({
 
   return (
     <div className="space-y-1.5">
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-edge/60">
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-wash">
         <div
-          className="absolute inset-y-0 left-0 bg-accent/45"
+          className="absolute inset-y-0 left-0 bg-ink/30"
           style={{ width: `${b * 100}%` }}
         />
         <div
-          className="absolute inset-y-0 left-0 bg-accent"
+          className="absolute inset-y-0 left-0 bg-ink"
           style={{ width: `${a * 100}%` }}
         />
       </div>
-      <div className="flex gap-4 text-sm text-muted">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
         {p180 != null && (
           <span>
-            <span className="mono text-text">{Math.round(a * 100)}%</span> issued by 6 mo
+            <span className="mono text-ink">{Math.round(a * 100)}%</span> issued by 6 mo
           </span>
         )}
         {p365 != null && (
           <span>
-            <span className="mono text-text">{Math.round(b * 100)}%</span> by 1 yr
+            <span className="mono text-ink">{Math.round(b * 100)}%</span> by 1 yr
           </span>
         )}
       </div>

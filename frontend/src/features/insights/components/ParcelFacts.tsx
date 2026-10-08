@@ -18,7 +18,7 @@ const dash = (v: unknown) => (v == null || v === "" ? "—" : String(v));
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-muted">{label}</dt>
+      <dt className="text-ink-2">{label}</dt>
       <dd className="mono text-right">{value}</dd>
     </div>
   );
@@ -26,10 +26,10 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function ParcelFacts({ parcel }: { parcel: ParcelContext }) {
   return (
-    <section className="rounded-lg border border-edge bg-panel p-5">
-      <h2 className="text-sm uppercase tracking-wider text-muted">Parcel</h2>
+    <section className="rounded-2xl border border-rule bg-card p-5 sm:p-6">
+      <h2 className="eyebrow">Parcel</h2>
 
-      <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2 sm:gap-x-8">
+      <dl className="mt-4 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
         <Fact label="Zone" value={dash(parcel.zone)} />
         <Fact label="Use code" value={dash(parcel.nucleus_use_cd)} />
         <Fact
@@ -44,12 +44,12 @@ export function ParcelFacts({ parcel }: { parcel: ParcelContext }) {
       </dl>
 
       {parcel.in_coastal_overlay && (
-        <p className="mt-4 rounded border border-edge bg-ink/40 p-2.5 text-sm leading-relaxed">
-          <span className="text-muted">Coastal Overlay</span>
+        <p className="mt-4 rounded-md bg-wash p-2.5 text-sm leading-relaxed">
+          <span className="text-ink-2">Coastal Overlay</span>
           {parcel.coastal_zone && (
             <>
               {" · "}
-              <span className="mono text-accent">{parcel.coastal_zone}</span>
+              <span className="mono font-medium">{parcel.coastal_zone}</span>
               {COASTAL_ZONE_COPY[parcel.coastal_zone] && ` — ${COASTAL_ZONE_COPY[parcel.coastal_zone]}`}
             </>
           )}
